@@ -468,12 +468,19 @@ def fetch_keywords_for_abstract(abstract: str, session: requests.Session) -> Lis
     if KEYWORD_X_TITLE:
         headers["X-Title"] = KEYWORD_X_TITLE
 
-    try:
-        response = session.post(KEYWORD_API_URL, headers=headers, json=payload, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-    except (requests.RequestException, ValueError) as exc:
-        print(f"Warning: failed to fetch keywords from OpenRouter: {exc}")
+    attempt = 0
+    data = None
+    while attempt < 3:
+        attempt += 1
+        try:
+            response = session.post(KEYWORD_API_URL, headers=headers, json=payload, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            break
+        except (requests.RequestException, ValueError) as exc:
+            print(f"Warning: keyword API attempt {attempt} failed: {exc}")
+            data = None
+    if not data:
         KEYWORD_CACHE[cache_key] = []
         return []
 
@@ -1752,15 +1759,32 @@ def main() -> None:
 
     session.close()
 
+    generated_at_dt = datetime.now().astimezone()
     payload = {
-        "generated_at": datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z"),
+        "generated_at": generated_at_dt.strftime("%Y-%m-%d %H:%M %Z"),
         "sources": sources_payload,
         "preferences": config,
         "default_source": default_source_key,
     }
 
+    dated_filename = Path(f"index-{generated_at_dt.strftime('%Y-%m-%d')}.html")
     html = build_html(payload)
-    write_output(html, args.output)
+    write_output(html, dated_filename)
+
+    redirect_html = dedent(
+        f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta http-equiv="refresh" content="0; url={dated_filename.name}">
+        </head>
+        <body>
+          <p>Redirecting...</p>
+        </body>
+        </html>
+        """
+    ).strip()
+    write_output(redirect_html, args.output)
 
 
 if __name__ == "__main__":
