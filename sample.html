@@ -431,6 +431,22 @@
     .paper h3 .quick-view-button {
       flex: 0 0 auto;
     }
+    .keyword-tags {
+      display: inline-flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin: 0 4px;
+    }
+    .keyword-tag {
+      background: rgba(15, 23, 42, 0.08);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      letter-spacing: 0.02em;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
     .paper h3 a {
       color: inherit;
       text-decoration: none;
@@ -567,6 +583,11 @@
     body.display-mode-authors .paper:not(.paper--expanded) .links .link-button {
       padding: 4px 10px;
       font-size: 0.85rem;
+    }
+    body.display-mode-title .paper:not(.paper--expanded) .keyword-tag,
+    body.display-mode-authors .paper:not(.paper--expanded) .keyword-tag {
+      font-size: 0.7rem;
+      padding: 3px 6px;
     }
     body.modal-open {
       overflow: hidden;
@@ -995,7 +1016,7 @@
   <footer>
     Source: <a id="footer-source" href="https://arxiv.org/list/cs.CV/recent?skip=0&amp;show=2000" target="_blank" rel="noopener">Computer Vision (cs.CV)</a>
   </footer>
-  <script type="application/json" id="digest-data">{"generated_at": "2024-07-01 12:00 UTC", "default_source": "cs.CV", "preferences": {"favorite_authors": ["Test Author"], "keywords": ["Vision"]}, "sources": {"cs.CV": {"label": "Computer Vision (cs.CV)", "url": "https://arxiv.org/list/cs.CV/recent?skip=0&show=2000", "date": "2024-07-01", "stats": {"total": 1, "unique_authors": 1, "total_authorships": 1, "average_authors": 1.0, "top_authors": [["Test Author", 1]], "top_phrases": [["test phrase", 1]], "section_counts": {"New submissions": 1}}, "articles": [{"arxiv_id": "1234.5678", "title": "Test Paper", "abs_url": "https://arxiv.org/abs/1234.5678", "pdf_url": "https://arxiv.org/pdf/1234.5678", "authors": ["Test Author"], "abstract": "Autoregressive video diffusion models are capable of long rollouts that are stable and consistent with history, but they are unable to guide the current generation with conditioning from the future. In camera-guided video generation with a predefined camera trajectory, this limitation leads to collisions with the generated scene, after which autoregression quickly collapses. To address this, we propose Generative View Stitching (GVS), which samples the entire sequence in parallel such that the generated scene is faithful to every part of the predefined camera trajectory. Our main contribution is a sampling algorithm that extends prior work on diffusion stitching for robot planning to video generation. While such stitching methods usually require a specially trained model, GVS is compatible with any off-the-shelf video model trained with Diffusion Forcing, a prevalent sequence diffusion framework that we show already provides the affordances necessary for stitching. We then introduce Omni Guidance, a technique that enhances the temporal consistency in stitching by conditioning on both the past and future, and that enables our proposed loop-closing mechanism for delivering long-range coherence. Overall, GVS achieves camera-guided video generation that is stable, collision-free, frame-to-frame consistent, and closes loops for a variety of predefined camera paths, including Oscar Reutersvärd's Impossible Staircase. Results are best viewed as videos at this https URL.", "primary_subject": "Computer Vision", "subjects": ["cs.CV"], "section_type": "New submissions", "submission_date": "2024-06-30"}]}, "cs.RO": {"label": "Robotics (cs.RO)", "url": "https://arxiv.org/list/cs.RO/recent?skip=0&show=2000", "date": "2024-07-01", "stats": {"total": 0, "unique_authors": 0, "total_authorships": 0, "average_authors": 0.0, "top_authors": [], "top_phrases": [], "section_counts": {}}, "articles": []}}}</script>
+  <script type="application/json" id="digest-data">{"generated_at": "2024-07-01 12:00 UTC", "default_source": "cs.CV", "preferences": {"favorite_authors": ["Test Author"], "keywords": ["Vision"]}, "sources": {"cs.CV": {"label": "Computer Vision (cs.CV)", "url": "https://arxiv.org/list/cs.CV/recent?skip=0&show=2000", "date": "2024-07-01", "stats": {"total": 1, "unique_authors": 1, "total_authorships": 1, "average_authors": 1.0, "top_authors": [["Test Author", 1]], "top_phrases": [["test phrase", 1]], "section_counts": {"New submissions": 1}}, "articles": [{"arxiv_id": "1234.5678", "title": "Test Paper", "abs_url": "https://arxiv.org/abs/1234.5678", "pdf_url": "https://arxiv.org/pdf/1234.5678", "authors": ["Test Author"], "abstract": "Autoregressive video diffusion models are capable of long rollouts that are stable and consistent with history, but they are unable to guide the current generation with conditioning from the future. In camera-guided video generation with a predefined camera trajectory, this limitation leads to collisions with the generated scene, after which autoregression quickly collapses. To address this, we propose Generative View Stitching (GVS), which samples the entire sequence in parallel such that the generated scene is faithful to every part of the predefined camera trajectory. Our main contribution is a sampling algorithm that extends prior work on diffusion stitching for robot planning to video generation. While such stitching methods usually require a specially trained model, GVS is compatible with any off-the-shelf video model trained with Diffusion Forcing, a prevalent sequence diffusion framework that we show already provides the affordances necessary for stitching. We then introduce Omni Guidance, a technique that enhances the temporal consistency in stitching by conditioning on both the past and future, and that enables our proposed loop-closing mechanism for delivering long-range coherence. Overall, GVS achieves camera-guided video generation that is stable, collision-free, frame-to-frame consistent, and closes loops for a variety of predefined camera paths, including Oscar Reutersvärd's Impossible Staircase. Results are best viewed as videos at this https URL.", "primary_subject": "Computer Vision", "subjects": ["cs.CV"], "section_type": "New submissions", "submission_date": "2024-06-30", "keywords": ["Test keyword", "Vision"]}]}, "cs.RO": {"label": "Robotics (cs.RO)", "url": "https://arxiv.org/list/cs.RO/recent?skip=0&show=2000", "date": "2024-07-01", "stats": {"total": 0, "unique_authors": 0, "total_authorships": 0, "average_authors": 0.0, "top_authors": [], "top_phrases": [], "section_counts": {}}, "articles": []}}}</script>
   <script>
 (() => {
   const RAW_DATA = JSON.parse(document.getElementById('digest-data').textContent);

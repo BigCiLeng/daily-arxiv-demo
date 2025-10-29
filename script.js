@@ -278,7 +278,7 @@
     const totalAuthorships = stats.total_authorships || 0;
     const averageAuthors = (stats.average_authors || 0).toFixed(2);
     const topAuthors = (stats.top_authors || []).map(([name, count]) => `<li>${escapeHtml(name)} (${count})</li>`).join('') || '<li>None</li>';
-    const topPhrases = (stats.top_phrases || []).map(([phrase, count]) => `<li>${escapeHtml(phrase)} (${count})</li>`).join('') || '<li>None</li>';
+    const topKeywords = (stats.top_phrases || []).map(([phrase, count]) => `<li>${escapeHtml(phrase)} (${count})</li>`).join('') || '<li>None</li>';
     const sectionCounts = Object.entries(stats.section_counts || {})
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([section, count]) => `<li>${escapeHtml(section)} (${count})</li>`)
@@ -301,8 +301,8 @@
           <ul>${topAuthors}</ul>
         </div>
         <div class="stat-card">
-          <h3>Popular Phrases</h3>
-          <ul>${topPhrases}</ul>
+          <h3>Popular Keywords</h3>
+          <ul>${topKeywords}</ul>
         </div>
         <div class="stat-card">
           <h3>Section Breakdown</h3>
@@ -661,13 +661,17 @@
     const pdfUrl = article.pdf_url ? escapeHtml(article.pdf_url) : '';
     const pdfLink = pdfUrl ? `<a href="${pdfUrl}" target="_blank" rel="noopener">PDF</a>` : '';
     const quickViewButton = `<button type="button" class="link-button quick-view-button js-view-abstract" data-abs-url="${absUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}">Quick view</button>`;
+    const keywords = Array.isArray(article.keywords) ? article.keywords : [];
+    const keywordBadges = keywords.length
+      ? `<span class="keyword-tags">${keywords.map((keyword) => `<span class="keyword-tag">${escapeHtml(keyword)}</span>`).join('')}</span>`
+      : '';
     const linkItems = [`<a href="${absUrl}" target="_blank" rel="noopener">Abstract</a>`, pdfLink].filter(Boolean).join(' ');
     const isUserExpanded = state.expandedArticles.has(articleId);
     const ariaExpanded = state.displayMode === 'full' || isUserExpanded;
     const expandedClass = isUserExpanded ? ' paper--expanded' : '';
     return `
       <article class="paper${expandedClass}" data-paper-id="${escapeHtml(articleId)}" tabindex="0" aria-expanded="${ariaExpanded}">
-        <h3><a href="${absUrl}" target="_blank" rel="noopener">${title}</a>${quickViewButton}</h3>
+        <h3><a href="${absUrl}" target="_blank" rel="noopener">${title}</a>${keywordBadges}${quickViewButton}</h3>
         <p class="meta">
           <span class="id">${escapeHtml(article.arxiv_id)}</span>
           <span class="authors">${authors}</span>
@@ -727,8 +731,14 @@
     const needles = (keywords || []).map((kw) => kw.toLowerCase()).filter(Boolean);
     if (!needles.length) return [];
     return articles.filter((article) => {
-      const haystack = `${article.title} ${article.abstract}`.toLowerCase();
-      return needles.some((needle) => haystack.includes(needle));
+      const articleKeywords = Array.isArray(article.keywords)
+        ? article.keywords.map((kw) => kw.toLowerCase())
+        : [];
+      if (articleKeywords.length) {
+        return needles.some((needle) => articleKeywords.includes(needle));
+      }
+      const fallback = `${article.title} ${article.abstract}`.toLowerCase();
+      return needles.some((needle) => fallback.includes(needle));
     });
   }
 

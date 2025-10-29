@@ -11,10 +11,11 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import os
 import sys
 from collections import Counter, defaultdict
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
 from textwrap import dedent
@@ -49,6 +50,18 @@ DEFAULT_CONFIG = {
     "keywords": [],
 }
 DETAIL_ABSTRACT_CACHE: Dict[str, str] = {}
+KEYWORD_CACHE: Dict[str, List[str]] = {}
+
+# KEYWORD_API_URL = os.getenv("OPENROUTER_API_URL", "https://openrouter.ai/api/v1/chat/completions")
+# KEYWORD_API_KEY = os.getenv("OPENROUTER_API_KEY", "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").strip()
+# KEYWORD_API_MODEL = os.getenv("OPENROUTER_KEYWORD_MODEL", "deepseek/deepseek-r1-0528-qwen3-8b:free")
+KEYWORD_API_URL = os.getenv("OPENROUTER_API_URL", "https://api.siliconflow.cn/v1/chat/completions")
+KEYWORD_API_KEY = os.getenv("OPENROUTER_API_KEY", "sk-jezzaxcyhijfasbbjcgmomdkqluhumkpkdemcefqwhwjvwmg")
+KEYWORD_API_MODEL = os.getenv("OPENROUTER_KEYWORD_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+
+KEYWORD_HTTP_REFERER = os.getenv("OPENROUTER_HTTP_REFERER", "")
+KEYWORD_X_TITLE = os.getenv("OPENROUTER_X_TITLE", "arXiv Daily Digest")
+KEYWORD_TARGET_COUNT = max(1, int(os.getenv("OPENROUTER_KEYWORD_COUNT", "2")))
 STOPWORDS = {
     "the",
     "and",
@@ -225,6 +238,7 @@ class Article:
     subjects: List[str]
     section_type: str
     submission_date: datetime
+    keywords: List[str] = field(default_factory=list)
 
 
 def load_config(path: Path) -> Dict[str, List[str]]:
@@ -371,6 +385,7 @@ def extract_article(dt_tag, dd_tag, section_type: str, section_date: date, sessi
     full_abstract = fetch_full_abstract(abs_url, session)
     if full_abstract:
         abstract = full_abstract
+    keywords = fetch_keywords_for_abstract(abstract, session)
 
     subjects_div = dd_tag.find("div", class_="list-subjects")
     subjects_text = clean_descriptor_text(subjects_div, "Subjects:")
@@ -389,6 +404,7 @@ def extract_article(dt_tag, dd_tag, section_type: str, section_date: date, sessi
         subjects=subjects,
         section_type=section_type,
         submission_date=datetime.combine(section_date, datetime.min.time()).replace(tzinfo=timezone.utc),
+        keywords=keywords,
     )
 
 
@@ -413,6 +429,96 @@ def fetch_full_abstract(abs_url: str, session: requests.Session) -> str:
         text = text[len("abstract:"):].strip()
     DETAIL_ABSTRACT_CACHE[abs_url] = text
     return text
+
+
+def fetch_keywords_for_abstract(abstract: str, session: requests.Session) -> List[str]:
+    if not abstract or not KEYWORD_API_KEY or not KEYWORD_API_URL:
+        return []
+
+    cache_key = abstract.strip()
+    if cache_key in KEYWORD_CACHE:
+        return KEYWORD_CACHE[cache_key]
+
+    prompt = dedent(
+        """
+        Extract the two most informative keywords (single words or short noun phrases) from the research abstract below.
+        Respond with a JSON object of the form {{"keywords": ["keyword 1", "keyword 2"]}} using at most two items.
+
+        Abstract:
+        {abstract}
+        """
+    ).strip().format(abstract=abstract.strip())
+
+    payload = {
+        "model": KEYWORD_API_MODEL,
+        "messages": [
+            {"role": "system", "content": "You extract concise research keywords."},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.2,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {KEYWORD_API_KEY}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    if KEYWORD_HTTP_REFERER:
+        headers["HTTP-Referer"] = KEYWORD_HTTP_REFERER
+    if KEYWORD_X_TITLE:
+        headers["X-Title"] = KEYWORD_X_TITLE
+
+    try:
+        response = session.post(KEYWORD_API_URL, headers=headers, json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+    except (requests.RequestException, ValueError) as exc:
+        print(f"Warning: failed to fetch keywords from OpenRouter: {exc}")
+        KEYWORD_CACHE[cache_key] = []
+        return []
+
+    content = (
+        data.get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "")
+        .strip()
+    )
+    keywords = parse_keywords_response(content)[:KEYWORD_TARGET_COUNT]
+    KEYWORD_CACHE[cache_key] = keywords
+    return keywords
+
+
+def parse_keywords_response(content: str) -> List[str]:
+    if not content:
+        return []
+
+    candidates: List[str] = []
+    try:
+        parsed = json.loads(content)
+        if isinstance(parsed, dict):
+            values = parsed.get("keywords")
+            if isinstance(values, list):
+                candidates = [str(item).strip() for item in values if str(item).strip()]
+        elif isinstance(parsed, list):
+            candidates = [str(item).strip() for item in parsed if str(item).strip()]
+    except json.JSONDecodeError:
+        pass
+
+    if not candidates:
+        parts = [part.strip(" •-\t") for part in re.split(r"[\n,;]+", content) if part.strip()]
+        candidates = parts
+
+    unique_keywords: List[str] = []
+    seen = set()
+    for keyword in candidates:
+        key = keyword.lower()
+        if key and key not in seen:
+            seen.add(key)
+            unique_keywords.append(keyword)
+        if len(unique_keywords) >= KEYWORD_TARGET_COUNT:
+            break
+
+    return unique_keywords
 
 
 def clean_descriptor_text(tag, descriptor_prefix: str) -> str:
@@ -446,7 +552,12 @@ def compute_statistics(articles: List[Article], grouped: Dict[str, Dict[str, Lis
         author_counter.update(article.authors)
     top_authors = author_counter.most_common(5)
 
-    top_phrases = extract_top_phrases(articles, top_n=3)
+    keyword_counter: Counter[str] = Counter()
+    for article in articles:
+        keyword_counter.update([keyword for keyword in article.keywords if keyword])
+    top_keywords = keyword_counter.most_common(5)
+    if not top_keywords:
+        top_keywords = extract_top_phrases(articles, top_n=3)
     avg_authors = (total_authorships / total) if total else 0.0
 
     return {
@@ -455,7 +566,7 @@ def compute_statistics(articles: List[Article], grouped: Dict[str, Dict[str, Lis
         "unique_authors": unique_authors,
         "section_counts": section_counts,
         "top_authors": top_authors,
-        "top_phrases": top_phrases,
+        "top_phrases": top_keywords,
         "average_authors": avg_authors,
     }
 
@@ -497,6 +608,7 @@ def article_to_dict(article: Article) -> Dict[str, object]:
         "subjects": article.subjects,
         "section_type": article.section_type,
         "submission_date": article.submission_date.date().isoformat(),
+        "keywords": article.keywords,
     }
 
 
@@ -957,6 +1069,22 @@ def build_html(payload: Dict[str, object]) -> str:
     .paper h3 .quick-view-button {
       flex: 0 0 auto;
     }
+    .keyword-tags {
+      display: inline-flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin: 0 4px;
+    }
+    .keyword-tag {
+      background: rgba(15, 23, 42, 0.08);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      letter-spacing: 0.02em;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
     .paper h3 a {
       color: inherit;
       text-decoration: none;
@@ -1090,6 +1218,11 @@ def build_html(payload: Dict[str, object]) -> str:
     body.display-mode-authors .paper:not(.paper--expanded) .links .link-button {
       padding: 4px 10px;
       font-size: 0.85rem;
+    }
+    body.display-mode-title .paper:not(.paper--expanded) .keyword-tag,
+    body.display-mode-authors .paper:not(.paper--expanded) .keyword-tag {
+      font-size: 0.7rem;
+      padding: 3px 6px;
     }
     body.modal-open {
       overflow: hidden;
