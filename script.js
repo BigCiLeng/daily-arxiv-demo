@@ -4,6 +4,17 @@
   const RAW_DATA = JSON.parse(document.getElementById('digest-data').textContent);
   const SOURCE_STORAGE_KEY = 'arxivDigestSource';
   const PREF_STORAGE_KEY = 'arxivDigestPreferences';
+  const DISPLAY_MODE_STORAGE_KEY = 'arxivDigestDisplayMode';
+  const DISPLAY_MODE_CLASSES = {
+    title: 'display-mode-title',
+    authors: 'display-mode-authors',
+    full: 'display-mode-full',
+  };
+  const DISPLAY_MODE_OPTIONS = [
+    { key: 'title', label: 'Title only' },
+    { key: 'authors', label: 'Title & authors' },
+    { key: 'full', label: 'Full details' },
+  ];
 
   const SOURCE_KEYS = Object.keys(RAW_DATA.sources || {});
   if (!SOURCE_KEYS.length) {
@@ -17,6 +28,8 @@
     preferences: loadStoredPreferences(),
     isEditingPreferences: false,
     activeSection: 'stats',
+    displayMode: loadStoredDisplayMode(),
+    expandedArticles: new Set(),
   };
 
   if (!RAW_DATA.sources[state.source]) {
@@ -27,6 +40,7 @@
 
   const elements = {
     sourceSwitcher: document.getElementById('source-switcher'),
+    displayModeControls: document.getElementById('display-mode-controls'),
     nav: document.querySelector('.sidebar nav'),
     preferencesView: document.getElementById('preferences-view'),
     preferencesForm: document.getElementById('preferences-form'),
@@ -51,6 +65,9 @@
     headerTotal: document.getElementById('meta-total'),
     footerSource: document.getElementById('footer-source'),
   };
+
+  document.addEventListener('click', handlePaperClick);
+  document.addEventListener('keydown', handlePaperKeydown);
 
   if (elements.editPreferences) {
     elements.editPreferences.addEventListener('click', () => {
@@ -103,6 +120,7 @@
       state.activeSection = 'stats';
     }
     renderSourceButtons();
+    renderDisplayModeControls();
     renderPreferencesPanel();
 
     const sourceData = RAW_DATA.sources[state.source];
@@ -111,6 +129,8 @@
     }
 
     const articles = sourceData.articles || [];
+    pruneExpandedArticles(articles);
+    applyDisplayModeClass();
     updateHeader(sourceData);
     const overviewCount = renderOverview(sourceData, articles);
     renderStats(sourceData);
@@ -121,6 +141,7 @@
     updateFooter(sourceData);
     attachSectionHandlers();
     setActiveSection(state.activeSection);
+    updatePaperAria();
   }
 
   function renderSourceButtons() {
@@ -139,8 +160,58 @@
         saveSource(nextSource);
         setStatus('');
         state.activeSection = 'stats';
+        state.expandedArticles.clear();
         renderAll({ resetActiveSection: true });
       });
+    });
+  }
+
+  function renderDisplayModeControls() {
+    const container = elements.displayModeControls;
+    if (!container) return;
+    const label = `<span class="display-mode__label">Paper view</span>`;
+    const buttons = DISPLAY_MODE_OPTIONS.map(({ key, label: buttonLabel }) => {
+      return `<button type="button" class="display-mode__button" data-mode="${key}" aria-pressed="false">${escapeHtml(buttonLabel)}</button>`;
+    }).join('');
+    container.innerHTML = `${label}${buttons}`;
+    Array.from(container.querySelectorAll('button[data-mode]')).forEach((button) => {
+      button.addEventListener('click', () => {
+        const mode = button.getAttribute('data-mode');
+        if (!mode) return;
+        setDisplayMode(mode);
+      });
+    });
+    updateDisplayModeButtons();
+  }
+
+  function setDisplayMode(mode) {
+    const normalized = normalizeDisplayMode(mode);
+    if (normalized === state.displayMode) {
+      return;
+    }
+    state.displayMode = normalized;
+    saveDisplayMode(normalized);
+    applyDisplayModeClass();
+    updateDisplayModeButtons();
+    updatePaperAria();
+  }
+
+  function applyDisplayModeClass() {
+    const targetClass = DISPLAY_MODE_CLASSES[state.displayMode] || DISPLAY_MODE_CLASSES.full;
+    const classList = document.body.classList;
+    Object.values(DISPLAY_MODE_CLASSES).forEach((cls) => classList.remove(cls));
+    classList.add(targetClass);
+  }
+
+  function updateDisplayModeButtons() {
+    const container = elements.displayModeControls;
+    if (!container) return;
+    const activeMode = state.displayMode;
+    Array.from(container.querySelectorAll('button[data-mode]')).forEach((button) => {
+      const mode = button.getAttribute('data-mode');
+      const isActive = mode === activeMode;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', String(isActive));
     });
   }
 
@@ -396,6 +467,45 @@
     }
   }
 
+  function updatePaperAria() {
+    const cards = Array.from(document.querySelectorAll('.paper'));
+    cards.forEach((card) => {
+      const paperId = card.getAttribute('data-paper-id') || '';
+      const isUserExpanded = paperId && state.expandedArticles.has(paperId);
+      const isExpanded = state.displayMode === 'full' || Boolean(isUserExpanded);
+      card.setAttribute('aria-expanded', String(isExpanded));
+      card.classList.toggle('paper--expanded', Boolean(isUserExpanded));
+    });
+  }
+
+  function handlePaperClick(event) {
+    const paper = event.target.closest('.paper');
+    if (!paper) return;
+    if (event.target.closest('a')) return;
+    togglePaperExpansion(paper);
+  }
+
+  function handlePaperKeydown(event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const paper = event.target.closest('.paper');
+    if (!paper) return;
+    if (event.key === ' ') {
+      event.preventDefault();
+    }
+    togglePaperExpansion(paper);
+  }
+
+  function togglePaperExpansion(paper) {
+    const paperId = paper.getAttribute('data-paper-id') || '';
+    if (!paperId) return;
+    if (state.expandedArticles.has(paperId)) {
+      state.expandedArticles.delete(paperId);
+    } else {
+      state.expandedArticles.add(paperId);
+    }
+    updatePaperAria();
+  }
+
   function setSectionState(section, expanded) {
     if (expanded) {
       section.classList.add('is-expanded');
@@ -421,12 +531,16 @@
   }
 
   function renderArticleCard(article) {
-    const authors = escapeHtml(article.authors.join(', '));
-    const subjects = escapeHtml(article.subjects.join('; '));
+    const articleId = String(article.arxiv_id || article.id || '');
+    const authors = escapeHtml((article.authors || []).join(', '));
+    const subjects = escapeHtml((article.subjects || []).join('; '));
     const abstract = escapeHtml(article.abstract);
     const pdfLink = article.pdf_url ? `<a href="${article.pdf_url}" target="_blank" rel="noopener">PDF</a>` : '';
+    const isUserExpanded = state.expandedArticles.has(articleId);
+    const ariaExpanded = state.displayMode === 'full' || isUserExpanded;
+    const expandedClass = isUserExpanded ? ' paper--expanded' : '';
     return `
-      <article class="paper">
+      <article class="paper${expandedClass}" data-paper-id="${escapeHtml(articleId)}" tabindex="0" aria-expanded="${ariaExpanded}">
         <h3><a href="${article.abs_url}" target="_blank" rel="noopener">${escapeHtml(article.title)}</a></h3>
         <p class="meta">
           <span class="id">${escapeHtml(article.arxiv_id)}</span>
@@ -493,6 +607,17 @@
     });
   }
 
+  function pruneExpandedArticles(articles) {
+    const ids = new Set(
+      (articles || []).map((article) => String(article.arxiv_id || article.id || '')).filter((value) => value),
+    );
+    Array.from(state.expandedArticles).forEach((storedId) => {
+      if (!ids.has(storedId)) {
+        state.expandedArticles.delete(storedId);
+      }
+    });
+  }
+
   function updatePreferenceInputs() {
     if (elements.favoritesInput) {
       elements.favoritesInput.value = state.preferences.favorite_authors.join('\n');
@@ -534,6 +659,14 @@
     return `${count} paper${count === 1 ? '' : 's'}`;
   }
 
+  function normalizeDisplayMode(value) {
+    if (typeof value !== 'string') {
+      return 'full';
+    }
+    const normalized = value.trim().toLowerCase();
+    return Object.prototype.hasOwnProperty.call(DISPLAY_MODE_CLASSES, normalized) ? normalized : 'full';
+  }
+
   function normalizePreferences(raw) {
     const normalizeList = (value) => {
       if (Array.isArray(value)) {
@@ -553,6 +686,21 @@
       favorite_authors: normalizeList(raw.favorite_authors),
       keywords: normalizeList(raw.keywords),
     };
+  }
+
+  function loadStoredDisplayMode() {
+    try {
+      const stored = localStorage.getItem(DISPLAY_MODE_STORAGE_KEY);
+      return normalizeDisplayMode(stored);
+    } catch (_) {
+      return 'full';
+    }
+  }
+
+  function saveDisplayMode(mode) {
+    try {
+      localStorage.setItem(DISPLAY_MODE_STORAGE_KEY, normalizeDisplayMode(mode));
+    } catch (_) {}
   }
 
   function loadStoredSource() {
