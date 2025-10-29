@@ -48,6 +48,7 @@ DEFAULT_CONFIG = {
     "favorite_authors": [],
     "keywords": [],
 }
+DETAIL_ABSTRACT_CACHE: Dict[str, str] = {}
 STOPWORDS = {
     "the",
     "and",
@@ -244,9 +245,9 @@ def load_config(path: Path) -> Dict[str, List[str]]:
     return config
 
 
-def fetch_recent_page(list_url: str) -> BeautifulSoup:
+def fetch_recent_page(list_url: str, session: requests.Session) -> BeautifulSoup:
     try:
-        response = requests.get(list_url, headers=HTTP_HEADERS, timeout=20)
+        response = session.get(list_url, headers=HTTP_HEADERS, timeout=20)
         response.raise_for_status()
     except requests.RequestException as exc:
         raise SystemExit(f"Failed to fetch arXiv page {list_url}: {exc}") from exc
@@ -317,7 +318,7 @@ def _parse_date(date_str: str) -> date:
     return datetime.now().date()
 
 
-def parse_articles_for_date(target_date: date, soup: BeautifulSoup) -> List[Article]:
+def parse_articles_for_date(target_date: date, soup: BeautifulSoup, session: requests.Session) -> List[Article]:
     articles: List[Article] = []
     sections = list(parse_sections(soup))
     matching_sections = [(date, section_type, dl) for date, section_type, dl in sections if date == target_date]
@@ -333,14 +334,14 @@ def parse_articles_for_date(target_date: date, soup: BeautifulSoup) -> List[Arti
             dd = dt.find_next_sibling("dd")
             if not dd:
                 continue
-            article = extract_article(dt, dd, section_type, section_date)
+            article = extract_article(dt, dd, section_type, section_date, session)
             if article:
                 articles.append(article)
 
     return articles
 
 
-def extract_article(dt_tag, dd_tag, section_type: str, section_date: date) -> Article | None:
+def extract_article(dt_tag, dd_tag, section_type: str, section_date: date, session: requests.Session) -> Article | None:
     id_anchor = dt_tag.find("a", title="Abstract")
     if not id_anchor:
         id_anchor = dt_tag.find("a", href=re.compile(r"/abs/"))
@@ -367,6 +368,9 @@ def extract_article(dt_tag, dd_tag, section_type: str, section_date: date) -> Ar
     if abstract_div is None:
         abstract_div = dd_tag.find("div", class_="mathjax")
     abstract = clean_descriptor_text(abstract_div, "Abstract:")
+    full_abstract = fetch_full_abstract(abs_url, session)
+    if full_abstract:
+        abstract = full_abstract
 
     subjects_div = dd_tag.find("div", class_="list-subjects")
     subjects_text = clean_descriptor_text(subjects_div, "Subjects:")
@@ -386,6 +390,29 @@ def extract_article(dt_tag, dd_tag, section_type: str, section_date: date) -> Ar
         section_type=section_type,
         submission_date=datetime.combine(section_date, datetime.min.time()).replace(tzinfo=timezone.utc),
     )
+
+
+def fetch_full_abstract(abs_url: str, session: requests.Session) -> str:
+    if not abs_url:
+        return ""
+    if abs_url in DETAIL_ABSTRACT_CACHE:
+        return DETAIL_ABSTRACT_CACHE[abs_url]
+    try:
+        response = session.get(abs_url, headers=HTTP_HEADERS, timeout=20)
+        response.raise_for_status()
+    except requests.RequestException:
+        return ""
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    blockquote = soup.select_one("blockquote.abstract")
+    if not blockquote:
+        return ""
+
+    text = blockquote.get_text(" ", strip=True)
+    if text.lower().startswith("abstract:"):
+        text = text[len("abstract:"):].strip()
+    DETAIL_ABSTRACT_CACHE[abs_url] = text
+    return text
 
 
 def clean_descriptor_text(tag, descriptor_prefix: str) -> str:
@@ -922,6 +949,13 @@ def build_html(payload: Dict[str, object]) -> str:
     .paper h3 {
       margin: 0 0 12px 0;
       font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .paper h3 .quick-view-button {
+      flex: 0 0 auto;
     }
     .paper h3 a {
       color: inherit;
@@ -955,6 +989,8 @@ def build_html(payload: Dict[str, object]) -> str:
       display: flex;
       gap: 16px;
       font-weight: 600;
+      flex-wrap: wrap;
+      margin: 0;
     }
     .paper .links a {
       color: var(--brand);
@@ -962,6 +998,29 @@ def build_html(payload: Dict[str, object]) -> str:
     }
     .paper .links a:hover {
       text-decoration: underline;
+    }
+    .paper .link-button {
+      appearance: none;
+      border: 1px solid rgba(37, 99, 235, 0.4);
+      background: rgba(37, 99, 235, 0.08);
+      color: var(--brand);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+    .paper .link-button:hover,
+    .paper .link-button:focus {
+      background: rgba(37, 99, 235, 0.18);
+      border-color: rgba(37, 99, 235, 0.55);
+      outline: none;
+      transform: translateY(-1px);
+    }
+    body.display-mode-title .paper:not(.paper--expanded) .quick-view-button,
+    body.display-mode-authors .paper:not(.paper--expanded) .quick-view-button {
+      padding: 4px 10px;
+      font-size: 0.85rem;
     }
     .paper:hover {
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 12px 24px rgba(15, 23, 42, 0.12);
@@ -973,17 +1032,198 @@ def build_html(payload: Dict[str, object]) -> str:
     }
     body.display-mode-title .paper:not(.paper--expanded) .meta,
     body.display-mode-title .paper:not(.paper--expanded) .subjects,
-    body.display-mode-title .paper:not(.paper--expanded) .abstract,
-    body.display-mode-title .paper:not(.paper--expanded) .links {
+    body.display-mode-title .paper:not(.paper--expanded) .abstract {
       display: none;
     }
     body.display-mode-authors .paper:not(.paper--expanded) .meta .id {
       display: none;
     }
     body.display-mode-authors .paper:not(.paper--expanded) .subjects,
-    body.display-mode-authors .paper:not(.paper--expanded) .abstract,
-    body.display-mode-authors .paper:not(.paper--expanded) .links {
+    body.display-mode-authors .paper:not(.paper--expanded) .abstract {
       display: none;
+    }
+    body.display-mode-title .paper:not(.paper--expanded),
+    body.display-mode-authors .paper:not(.paper--expanded) {
+      padding: 12px 16px;
+      border-radius: 12px;
+      border-color: rgba(148, 163, 184, 0.6);
+      box-shadow: none;
+      background: rgba(255, 255, 255, 0.92);
+      display: grid;
+      grid-template-columns: 1fr;
+      row-gap: 4px;
+    }
+    body.display-mode-title .paper:not(.paper--expanded) h3,
+    body.display-mode-authors .paper:not(.paper--expanded) h3 {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.3;
+    }
+    body.display-mode-title .paper:not(.paper--expanded) h3 a,
+    body.display-mode-authors .paper:not(.paper--expanded) h3 a {
+      display: inline-block;
+      max-width: 100%;
+    }
+    body.display-mode-authors .paper:not(.paper--expanded) .meta {
+      margin-bottom: 0;
+      gap: 6px;
+      font-size: 0.85rem;
+      line-height: 1.3;
+    }
+    body.display-mode-authors .paper:not(.paper--expanded) .authors {
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+    body.display-mode-title .paper:not(.paper--expanded) + .paper:not(.paper--expanded),
+    body.display-mode-authors .paper:not(.paper--expanded) + .paper:not(.paper--expanded) {
+      margin-top: 8px;
+    }
+    body.display-mode-title .paper:not(.paper--expanded) .links,
+    body.display-mode-authors .paper:not(.paper--expanded) .links {
+      gap: 8px;
+    }
+    body.display-mode-title .paper:not(.paper--expanded) .links a,
+    body.display-mode-authors .paper:not(.paper--expanded) .links a {
+      display: none;
+    }
+    body.display-mode-title .paper:not(.paper--expanded) .links .link-button,
+    body.display-mode-authors .paper:not(.paper--expanded) .links .link-button {
+      padding: 4px 10px;
+      font-size: 0.85rem;
+    }
+    body.modal-open {
+      overflow: hidden;
+    }
+    .abstract-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1200;
+    }
+    .abstract-modal.is-open {
+      display: flex;
+    }
+    .abstract-modal__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+    }
+    .abstract-modal__dialog {
+      position: relative;
+      width: min(960px, 92vw);
+      height: min(80vh, 720px);
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 40px 80px rgba(15, 23, 42, 0.35);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 1;
+    }
+    .abstract-modal__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+      gap: 12px;
+    }
+    .abstract-modal__title {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+      line-height: 1.4;
+      color: var(--text-primary);
+    }
+    .abstract-modal__close {
+      appearance: none;
+      border: none;
+      background: rgba(15, 23, 42, 0.04);
+      color: var(--text-secondary);
+      padding: 6px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .abstract-modal__close:hover,
+    .abstract-modal__close:focus {
+      background: rgba(37, 99, 235, 0.15);
+      color: var(--brand);
+      outline: none;
+    }
+    .abstract-modal__body {
+      flex: 1;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      overflow-y: auto;
+      background: linear-gradient(135deg, rgba(248, 250, 252, 0.9), rgba(241, 245, 249, 0.6));
+    }
+    .abstract-modal__meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+    }
+    .abstract-modal__id {
+      font-weight: 600;
+      color: var(--brand);
+    }
+    .abstract-modal__authors {
+      flex: 1 1 100%;
+    }
+    .abstract-modal__subjects {
+      flex: 1 1 100%;
+    }
+    .abstract-modal__abstract {
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      line-height: 1.65;
+      white-space: pre-line;
+    }
+    .abstract-modal__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: auto;
+    }
+    .abstract-modal__actions a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+    .abstract-modal__actions a.primary {
+      background: var(--brand);
+      color: white;
+      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
+    }
+    .abstract-modal__actions a.primary:hover,
+    .abstract-modal__actions a.primary:focus {
+      background: #1d4ed8;
+      transform: translateY(-1px);
+      outline: none;
+    }
+    .abstract-modal__actions a.secondary {
+      border: 1px solid rgba(37, 99, 235, 0.35);
+      color: var(--brand);
+      background: rgba(37, 99, 235, 0.1);
+    }
+    .abstract-modal__actions a.secondary:hover,
+    .abstract-modal__actions a.secondary:focus {
+      background: rgba(37, 99, 235, 0.18);
+      outline: none;
+      transform: translateY(-1px);
     }
     .empty-state {
       background: var(--bg-surface);
@@ -1167,7 +1407,7 @@ def build_html(payload: Dict[str, object]) -> str:
     }
   </style>
 </head>
-<body>
+<body class="display-mode-authors">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header>
     <div class="inner">
@@ -1255,6 +1495,27 @@ def build_html(payload: Dict[str, object]) -> str:
       </section>
     </main>
   </div>
+  <div class="abstract-modal" id="abstract-modal" aria-hidden="true">
+    <div class="abstract-modal__backdrop" data-modal-dismiss="true"></div>
+    <div class="abstract-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="abstract-modal-title">
+      <div class="abstract-modal__header">
+        <h2 class="abstract-modal__title" id="abstract-modal-title">Preview abstract</h2>
+        <button type="button" class="abstract-modal__close" id="abstract-modal-close">Close</button>
+      </div>
+      <div class="abstract-modal__body" id="abstract-modal-body">
+        <div class="abstract-modal__meta">
+          <span class="abstract-modal__id" id="abstract-modal-id"></span>
+          <span class="abstract-modal__authors" id="abstract-modal-authors"></span>
+          <span class="abstract-modal__subjects" id="abstract-modal-subjects"></span>
+        </div>
+        <div class="abstract-modal__abstract" id="abstract-modal-abstract"></div>
+        <div class="abstract-modal__actions">
+          <a href="#" target="_blank" rel="noopener" class="primary" id="abstract-modal-original">Open on arXiv</a>
+          <a href="#" target="_blank" rel="noopener" class="secondary" id="abstract-modal-pdf" hidden>Download PDF</a>
+        </div>
+      </div>
+    </div>
+  </div>
   <footer>
     Source: <a id="footer-source" href="__FOOTER_URL__" target="_blank" rel="noopener">__FOOTER_LABEL__</a>
   </footer>
@@ -1333,9 +1594,12 @@ def main() -> None:
     sources_payload: Dict[str, Dict[str, object]] = {}
     default_source_key = next(iter(ARXIV_SOURCES))
 
+    session = requests.Session()
+    session.headers.update(HTTP_HEADERS)
+
     for source_key, meta in ARXIV_SOURCES.items():
-        soup = fetch_recent_page(meta["url"])
-        articles = parse_articles_for_date(target_date, soup)
+        soup = fetch_recent_page(meta["url"], session)
+        articles = parse_articles_for_date(target_date, soup, session)
         if not articles:
             raise SystemExit(f"No papers were parsed from {meta['url']}. Please try again later.")
 
@@ -1352,6 +1616,8 @@ def main() -> None:
             "articles": [article_to_dict(article) for article in articles],
             "stats": stats,
         }
+
+    session.close()
 
     payload = {
         "generated_at": datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z"),

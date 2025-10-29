@@ -90,6 +90,43 @@
       box-shadow: 0 6px 18px rgba(14, 116, 244, 0.35);
       transform: translateY(-1px);
     }
+    .display-mode {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 12px;
+    }
+    .display-mode__label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: rgba(248, 250, 252, 0.85);
+      margin-right: 4px;
+    }
+    .display-mode__button {
+      appearance: none;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.2);
+      color: white;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+    .display-mode__button:hover,
+    .display-mode__button:focus {
+      background: rgba(37, 99, 235, 0.35);
+      border-color: rgba(96, 165, 250, 0.75);
+      outline: none;
+    }
+    .display-mode__button.is-active {
+      background: white;
+      color: var(--brand);
+      border-color: transparent;
+      box-shadow: 0 6px 18px rgba(14, 116, 244, 0.35);
+      transform: translateY(-1px);
+    }
     .layout {
       display: flex;
       gap: 32px;
@@ -377,6 +414,8 @@
       padding: 22px 24px;
       border: 1px solid var(--border);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
     }
     .paper + .paper {
       margin-top: 18px;
@@ -384,6 +423,13 @@
     .paper h3 {
       margin: 0 0 12px 0;
       font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .paper h3 .quick-view-button {
+      flex: 0 0 auto;
     }
     .paper h3 a {
       color: inherit;
@@ -417,6 +463,8 @@
       display: flex;
       gap: 16px;
       font-weight: 600;
+      flex-wrap: wrap;
+      margin: 0;
     }
     .paper .links a {
       color: var(--brand);
@@ -424,6 +472,235 @@
     }
     .paper .links a:hover {
       text-decoration: underline;
+    }
+    .paper .link-button {
+      appearance: none;
+      border: 1px solid rgba(37, 99, 235, 0.4);
+      background: rgba(37, 99, 235, 0.08);
+      color: var(--brand);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+    .paper .link-button:hover,
+    .paper .link-button:focus {
+      background: rgba(37, 99, 235, 0.18);
+      border-color: rgba(37, 99, 235, 0.55);
+      outline: none;
+      transform: translateY(-1px);
+    }
+    body.display-mode-title .paper:not(.paper--expanded) .quick-view-button,
+    body.display-mode-authors .paper:not(.paper--expanded) .quick-view-button {
+      padding: 4px 10px;
+      font-size: 0.85rem;
+    }
+    .paper:hover {
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 12px 24px rgba(15, 23, 42, 0.12);
+      transform: translateY(-1px);
+    }
+    .paper.paper--expanded {
+      border-color: var(--brand);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 16px 32px rgba(37, 99, 235, 0.18);
+    }
+    body.display-mode-title .paper:not(.paper--expanded) .meta,
+    body.display-mode-title .paper:not(.paper--expanded) .subjects,
+    body.display-mode-title .paper:not(.paper--expanded) .abstract {
+      display: none;
+    }
+    body.display-mode-authors .paper:not(.paper--expanded) .meta .id {
+      display: none;
+    }
+    body.display-mode-authors .paper:not(.paper--expanded) .subjects,
+    body.display-mode-authors .paper:not(.paper--expanded) .abstract {
+      display: none;
+    }
+    body.display-mode-title .paper:not(.paper--expanded),
+    body.display-mode-authors .paper:not(.paper--expanded) {
+      padding: 12px 16px;
+      border-radius: 12px;
+      border-color: rgba(148, 163, 184, 0.6);
+      box-shadow: none;
+      background: rgba(255, 255, 255, 0.92);
+      display: grid;
+      grid-template-columns: 1fr;
+      row-gap: 4px;
+    }
+    body.display-mode-title .paper:not(.paper--expanded) h3,
+    body.display-mode-authors .paper:not(.paper--expanded) h3 {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.3;
+    }
+    body.display-mode-title .paper:not(.paper--expanded) h3 a,
+    body.display-mode-authors .paper:not(.paper--expanded) h3 a {
+      display: inline-block;
+      max-width: 100%;
+    }
+    body.display-mode-title .paper:not(.paper--expanded) .meta {
+      margin-bottom: 0;
+    }
+    body.display-mode-authors .paper:not(.paper--expanded) .meta {
+      margin-bottom: 0;
+      gap: 6px;
+      font-size: 0.85rem;
+      line-height: 1.3;
+    }
+    body.display-mode-authors .paper:not(.paper--expanded) .authors {
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+    body.display-mode-title .paper:not(.paper--expanded) + .paper:not(.paper--expanded),
+    body.display-mode-authors .paper:not(.paper--expanded) + .paper:not(.paper--expanded) {
+      margin-top: 8px;
+    }
+    body.display-mode-title .paper:not(.paper--expanded) .links,
+    body.display-mode-authors .paper:not(.paper--expanded) .links {
+      gap: 8px;
+    }
+    body.display-mode-title .paper:not(.paper--expanded) .links a,
+    body.display-mode-authors .paper:not(.paper--expanded) .links a {
+      display: none;
+    }
+    body.display-mode-title .paper:not(.paper--expanded) .links .link-button,
+    body.display-mode-authors .paper:not(.paper--expanded) .links .link-button {
+      padding: 4px 10px;
+      font-size: 0.85rem;
+    }
+    body.modal-open {
+      overflow: hidden;
+    }
+    .abstract-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1200;
+    }
+    .abstract-modal.is-open {
+      display: flex;
+    }
+    .abstract-modal__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+    }
+    .abstract-modal__dialog {
+      position: relative;
+      width: min(960px, 92vw);
+      height: min(80vh, 720px);
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 40px 80px rgba(15, 23, 42, 0.35);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 1;
+    }
+    .abstract-modal__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+      gap: 12px;
+    }
+    .abstract-modal__title {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+      line-height: 1.4;
+      color: var(--text-primary);
+    }
+    .abstract-modal__close {
+      appearance: none;
+      border: none;
+      background: rgba(15, 23, 42, 0.04);
+      color: var(--text-secondary);
+      padding: 6px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .abstract-modal__close:hover,
+    .abstract-modal__close:focus {
+      background: rgba(37, 99, 235, 0.15);
+      color: var(--brand);
+      outline: none;
+    }
+    .abstract-modal__body {
+      flex: 1;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      overflow-y: auto;
+      background: linear-gradient(135deg, rgba(248, 250, 252, 0.9), rgba(241, 245, 249, 0.6));
+    }
+    .abstract-modal__meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+    }
+    .abstract-modal__id {
+      font-weight: 600;
+      color: var(--brand);
+    }
+    .abstract-modal__authors {
+      flex: 1 1 100%;
+    }
+    .abstract-modal__subjects {
+      flex: 1 1 100%;
+    }
+    .abstract-modal__abstract {
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      line-height: 1.65;
+      white-space: pre-line;
+    }
+    .abstract-modal__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: auto;
+    }
+    .abstract-modal__actions a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+    .abstract-modal__actions a.primary {
+      background: var(--brand);
+      color: white;
+      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
+    }
+    .abstract-modal__actions a.primary:hover,
+    .abstract-modal__actions a.primary:focus {
+      background: #1d4ed8;
+      transform: translateY(-1px);
+      outline: none;
+    }
+    .abstract-modal__actions a.secondary {
+      border: 1px solid rgba(37, 99, 235, 0.35);
+      color: var(--brand);
+      background: rgba(37, 99, 235, 0.1);
+    }
+    .abstract-modal__actions a.secondary:hover,
+    .abstract-modal__actions a.secondary:focus {
+      background: rgba(37, 99, 235, 0.18);
+      outline: none;
+      transform: translateY(-1px);
     }
     .empty-state {
       background: var(--bg-surface);
@@ -601,10 +878,13 @@
       .source-switcher {
         justify-content: flex-start;
       }
+      .display-mode {
+        justify-content: flex-start;
+      }
     }
   </style>
 </head>
-<body>
+<body class="display-mode-authors">
   <a class="skip-link" href="#main-content">Skip to content</a>
   <header>
     <div class="inner">
@@ -691,10 +971,31 @@
       </section>
     </main>
   </div>
+  <div class="abstract-modal" id="abstract-modal" aria-hidden="true">
+    <div class="abstract-modal__backdrop" data-modal-dismiss="true"></div>
+    <div class="abstract-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="abstract-modal-title">
+      <div class="abstract-modal__header">
+        <h2 class="abstract-modal__title" id="abstract-modal-title">Preview abstract</h2>
+        <button type="button" class="abstract-modal__close" id="abstract-modal-close">Close</button>
+      </div>
+      <div class="abstract-modal__body" id="abstract-modal-body">
+        <div class="abstract-modal__meta">
+          <span class="abstract-modal__id" id="abstract-modal-id"></span>
+          <span class="abstract-modal__authors" id="abstract-modal-authors"></span>
+          <span class="abstract-modal__subjects" id="abstract-modal-subjects"></span>
+        </div>
+        <div class="abstract-modal__abstract" id="abstract-modal-abstract"></div>
+        <div class="abstract-modal__actions">
+          <a href="#" target="_blank" rel="noopener" class="primary" id="abstract-modal-original">Open on arXiv</a>
+          <a href="#" target="_blank" rel="noopener" class="secondary" id="abstract-modal-pdf" hidden>Download PDF</a>
+        </div>
+      </div>
+    </div>
+  </div>
   <footer>
     Source: <a id="footer-source" href="https://arxiv.org/list/cs.CV/recent?skip=0&amp;show=2000" target="_blank" rel="noopener">Computer Vision (cs.CV)</a>
   </footer>
-  <script type="application/json" id="digest-data">{"generated_at": "2024-07-01 12:00 UTC", "default_source": "cs.CV", "preferences": {"favorite_authors": ["Test Author"], "keywords": ["Vision"]}, "sources": {"cs.CV": {"label": "Computer Vision (cs.CV)", "url": "https://arxiv.org/list/cs.CV/recent?skip=0&show=2000", "date": "2024-07-01", "stats": {"total": 1, "unique_authors": 1, "total_authorships": 1, "average_authors": 1.0, "top_authors": [["Test Author", 1]], "top_phrases": [["test phrase", 1]], "section_counts": {"New submissions": 1}}, "articles": [{"arxiv_id": "1234.5678", "title": "Test Paper", "abs_url": "https://arxiv.org/abs/1234.5678", "pdf_url": "https://arxiv.org/pdf/1234.5678", "authors": ["Test Author"], "abstract": "This is a test abstract.", "primary_subject": "Computer Vision", "subjects": ["cs.CV"], "section_type": "New submissions", "submission_date": "2024-06-30"}]}, "cs.RO": {"label": "Robotics (cs.RO)", "url": "https://arxiv.org/list/cs.RO/recent?skip=0&show=2000", "date": "2024-07-01", "stats": {"total": 0, "unique_authors": 0, "total_authorships": 0, "average_authors": 0.0, "top_authors": [], "top_phrases": [], "section_counts": {}}, "articles": []}}}</script>
+  <script type="application/json" id="digest-data">{"generated_at": "2024-07-01 12:00 UTC", "default_source": "cs.CV", "preferences": {"favorite_authors": ["Test Author"], "keywords": ["Vision"]}, "sources": {"cs.CV": {"label": "Computer Vision (cs.CV)", "url": "https://arxiv.org/list/cs.CV/recent?skip=0&show=2000", "date": "2024-07-01", "stats": {"total": 1, "unique_authors": 1, "total_authorships": 1, "average_authors": 1.0, "top_authors": [["Test Author", 1]], "top_phrases": [["test phrase", 1]], "section_counts": {"New submissions": 1}}, "articles": [{"arxiv_id": "1234.5678", "title": "Test Paper", "abs_url": "https://arxiv.org/abs/1234.5678", "pdf_url": "https://arxiv.org/pdf/1234.5678", "authors": ["Test Author"], "abstract": "Autoregressive video diffusion models are capable of long rollouts that are stable and consistent with history, but they are unable to guide the current generation with conditioning from the future. In camera-guided video generation with a predefined camera trajectory, this limitation leads to collisions with the generated scene, after which autoregression quickly collapses. To address this, we propose Generative View Stitching (GVS), which samples the entire sequence in parallel such that the generated scene is faithful to every part of the predefined camera trajectory. Our main contribution is a sampling algorithm that extends prior work on diffusion stitching for robot planning to video generation. While such stitching methods usually require a specially trained model, GVS is compatible with any off-the-shelf video model trained with Diffusion Forcing, a prevalent sequence diffusion framework that we show already provides the affordances necessary for stitching. We then introduce Omni Guidance, a technique that enhances the temporal consistency in stitching by conditioning on both the past and future, and that enables our proposed loop-closing mechanism for delivering long-range coherence. Overall, GVS achieves camera-guided video generation that is stable, collision-free, frame-to-frame consistent, and closes loops for a variety of predefined camera paths, including Oscar Reutersvärd's Impossible Staircase. Results are best viewed as videos at this https URL.", "primary_subject": "Computer Vision", "subjects": ["cs.CV"], "section_type": "New submissions", "submission_date": "2024-06-30"}]}, "cs.RO": {"label": "Robotics (cs.RO)", "url": "https://arxiv.org/list/cs.RO/recent?skip=0&show=2000", "date": "2024-07-01", "stats": {"total": 0, "unique_authors": 0, "total_authorships": 0, "average_authors": 0.0, "top_authors": [], "top_phrases": [], "section_counts": {}}, "articles": []}}}</script>
   <script>
 (() => {
   const RAW_DATA = JSON.parse(document.getElementById('digest-data').textContent);
@@ -711,6 +1012,7 @@
     { key: 'authors', label: 'Title & authors' },
     { key: 'full', label: 'Full details' },
   ];
+  let modalHandlersBound = false;
 
   const SOURCE_KEYS = Object.keys(RAW_DATA.sources || {});
   if (!SOURCE_KEYS.length) {
@@ -724,8 +1026,9 @@
     preferences: loadStoredPreferences(),
     isEditingPreferences: false,
     activeSection: 'stats',
-    displayMode: loadStoredDisplayMode(),
+    displayMode: loadStoredDisplayMode() || 'authors',
     expandedArticles: new Set(),
+    lastModalTrigger: null,
   };
 
   if (!RAW_DATA.sources[state.source]) {
@@ -760,10 +1063,22 @@
     headerGenerated: document.getElementById('meta-generated'),
     headerTotal: document.getElementById('meta-total'),
     footerSource: document.getElementById('footer-source'),
+    abstractModal: document.getElementById('abstract-modal'),
+    abstractModalClose: document.getElementById('abstract-modal-close'),
+    abstractModalTitle: document.getElementById('abstract-modal-title'),
+    abstractModalBody: document.getElementById('abstract-modal-body'),
+    abstractModalId: document.getElementById('abstract-modal-id'),
+    abstractModalAuthors: document.getElementById('abstract-modal-authors'),
+    abstractModalSubjects: document.getElementById('abstract-modal-subjects'),
+    abstractModalAbstract: document.getElementById('abstract-modal-abstract'),
+    abstractModalOriginal: document.getElementById('abstract-modal-original'),
+    abstractModalPdf: document.getElementById('abstract-modal-pdf'),
   };
 
+  document.addEventListener('click', handleQuickViewClick);
   document.addEventListener('click', handlePaperClick);
   document.addEventListener('keydown', handlePaperKeydown);
+  document.addEventListener('keydown', handleGlobalKeydown);
 
   if (elements.editPreferences) {
     elements.editPreferences.addEventListener('click', () => {
@@ -836,6 +1151,7 @@
     renderNavigation(sourceData, overviewCount, favoriteCount, keywordCount, categoriesNavItems);
     updateFooter(sourceData);
     attachSectionHandlers();
+    attachModalHandlers();
     setActiveSection(state.activeSection);
     updatePaperAria();
   }
@@ -1174,10 +1490,22 @@
     });
   }
 
+  function handleQuickViewClick(event) {
+    const button = event.target.closest('.js-view-abstract');
+    if (!button) return;
+    const articleId = button.getAttribute('data-article-id') || '';
+    const details = buildModalDetails(articleId, button);
+    if (!details.url && !details.title) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openAbstractModal(details, button);
+  }
+
   function handlePaperClick(event) {
     const paper = event.target.closest('.paper');
     if (!paper) return;
     if (event.target.closest('a')) return;
+    if (event.target.closest('.js-view-abstract')) return;
     togglePaperExpansion(paper);
   }
 
@@ -1200,6 +1528,100 @@
       state.expandedArticles.add(paperId);
     }
     updatePaperAria();
+  }
+
+  function attachModalHandlers() {
+    if (modalHandlersBound) return;
+    modalHandlersBound = true;
+    if (elements.abstractModalClose) {
+      elements.abstractModalClose.addEventListener('click', () => closeAbstractModal());
+    }
+    if (elements.abstractModal) {
+      elements.abstractModal.addEventListener('click', (event) => {
+        if (event.target && event.target.getAttribute('data-modal-dismiss') === 'true') {
+          closeAbstractModal();
+        }
+      });
+    }
+  }
+
+  function handleGlobalKeydown(event) {
+    if (event.key === 'Escape' && isModalOpen()) {
+      event.preventDefault();
+      closeAbstractModal();
+    }
+  }
+
+  function isModalOpen() {
+    return Boolean(elements.abstractModal && elements.abstractModal.classList.contains('is-open'));
+  }
+
+  function openAbstractModal(details, trigger) {
+    if (!elements.abstractModal) return;
+    state.lastModalTrigger = trigger || null;
+    const resolvedTitle = decodeHtml(details.title) || 'Preview abstract';
+    const resolvedUrl = decodeHtml(details.url);
+    const resolvedAuthors = decodeHtml(details.authors);
+    const resolvedSubjects = decodeHtml(details.subjects);
+    const resolvedAbstract = decodeHtml(details.abstract);
+    const resolvedId = decodeHtml(details.arxivId);
+    const resolvedPdf = decodeHtml(details.pdfUrl);
+    elements.abstractModal.classList.add('is-open');
+    elements.abstractModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    if (elements.abstractModalClose) {
+      elements.abstractModalClose.focus();
+    }
+    if (elements.abstractModalTitle) {
+      elements.abstractModalTitle.textContent = resolvedTitle;
+    }
+    if (elements.abstractModalBody) {
+      elements.abstractModalBody.scrollTop = 0;
+    }
+    if (elements.abstractModalId) {
+      elements.abstractModalId.textContent = resolvedId ? `ID: ${resolvedId}` : '';
+      elements.abstractModalId.hidden = !resolvedId;
+    }
+    if (elements.abstractModalAuthors) {
+      elements.abstractModalAuthors.textContent = resolvedAuthors ? `Authors: ${resolvedAuthors}` : '';
+      elements.abstractModalAuthors.hidden = !resolvedAuthors;
+    }
+    if (elements.abstractModalSubjects) {
+      elements.abstractModalSubjects.textContent = resolvedSubjects ? `Subjects: ${resolvedSubjects}` : '';
+      elements.abstractModalSubjects.hidden = !resolvedSubjects;
+    }
+    if (elements.abstractModalAbstract) {
+      elements.abstractModalAbstract.textContent = resolvedAbstract || 'No abstract available.';
+    }
+    if (elements.abstractModalOriginal) {
+      if (resolvedUrl) {
+        elements.abstractModalOriginal.href = resolvedUrl;
+        elements.abstractModalOriginal.hidden = false;
+      } else {
+        elements.abstractModalOriginal.href = '#';
+        elements.abstractModalOriginal.hidden = true;
+      }
+    }
+    if (elements.abstractModalPdf) {
+      if (resolvedPdf) {
+        elements.abstractModalPdf.href = resolvedPdf;
+        elements.abstractModalPdf.hidden = false;
+      } else {
+        elements.abstractModalPdf.href = '#';
+        elements.abstractModalPdf.hidden = true;
+      }
+    }
+  }
+
+  function closeAbstractModal() {
+    if (!elements.abstractModal) return;
+    elements.abstractModal.classList.remove('is-open');
+    elements.abstractModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+    if (state.lastModalTrigger && typeof state.lastModalTrigger.focus === 'function') {
+      state.lastModalTrigger.focus();
+    }
+    state.lastModalTrigger = null;
   }
 
   function setSectionState(section, expanded) {
@@ -1228,23 +1650,27 @@
 
   function renderArticleCard(article) {
     const articleId = String(article.arxiv_id || article.id || '');
+    const title = escapeHtml(article.title);
     const authors = escapeHtml((article.authors || []).join(', '));
     const subjects = escapeHtml((article.subjects || []).join('; '));
     const abstract = escapeHtml(article.abstract);
-    const pdfLink = article.pdf_url ? `<a href="${article.pdf_url}" target="_blank" rel="noopener">PDF</a>` : '';
+    const absUrl = escapeHtml(article.abs_url);
+    const pdfUrl = article.pdf_url ? escapeHtml(article.pdf_url) : '';
+    const pdfLink = pdfUrl ? `<a href="${pdfUrl}" target="_blank" rel="noopener">PDF</a>` : '';
+    const quickViewButton = `<button type="button" class="link-button quick-view-button js-view-abstract" data-abs-url="${absUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}">Quick view</button>`;
+    const linkItems = [`<a href="${absUrl}" target="_blank" rel="noopener">Abstract</a>`, pdfLink].filter(Boolean).join(' ');
     const isUserExpanded = state.expandedArticles.has(articleId);
     const ariaExpanded = state.displayMode === 'full' || isUserExpanded;
     const expandedClass = isUserExpanded ? ' paper--expanded' : '';
     return `
       <article class="paper${expandedClass}" data-paper-id="${escapeHtml(articleId)}" tabindex="0" aria-expanded="${ariaExpanded}">
-        <h3><a href="${article.abs_url}" target="_blank" rel="noopener">${escapeHtml(article.title)}</a></h3>
+        <h3><a href="${absUrl}" target="_blank" rel="noopener">${title}</a>${quickViewButton}</h3>
         <p class="meta">
           <span class="id">${escapeHtml(article.arxiv_id)}</span>
           <span class="authors">${authors}</span>
         </p>
         <p class="subjects">${subjects}</p>
-        <p class="abstract">${abstract}</p>
-        <p class="links"><a href="${article.abs_url}" target="_blank" rel="noopener">Abstract</a> ${pdfLink}</p>
+        <p class="links">${linkItems}</p>
       </article>
     `;
   }
@@ -1387,9 +1813,9 @@
   function loadStoredDisplayMode() {
     try {
       const stored = localStorage.getItem(DISPLAY_MODE_STORAGE_KEY);
-      return normalizeDisplayMode(stored);
+      return stored ? normalizeDisplayMode(stored) : '';
     } catch (_) {
-      return 'full';
+      return '';
     }
   }
 
@@ -1427,8 +1853,34 @@
       localStorage.setItem(PREF_STORAGE_KEY, JSON.stringify(prefs));
     } catch (_) {}
   }
-})();
 
+  function decodeHtml(value) {
+    if (!value) return '';
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = value;
+    return textarea.value;
+  }
+
+  function buildModalDetails(articleId, button) {
+    const sourceData = RAW_DATA.sources[state.source] || {};
+    const articles = Array.isArray(sourceData.articles) ? sourceData.articles : [];
+    const article = articleId ? articles.find((item) => {
+      const id = String(item.arxiv_id || item.id || '');
+      return id === articleId;
+    }) : null;
+    const dataset = button.dataset || {};
+    const details = {
+      title: article && article.title ? article.title : dataset.articleTitle || '',
+      url: article && article.abs_url ? article.abs_url : dataset.absUrl || '',
+      authors: Array.isArray(article && article.authors) ? article.authors.join(', ') : dataset.articleAuthors || '',
+      subjects: Array.isArray(article && article.subjects) ? article.subjects.join('; ') : dataset.articleSubjects || '',
+      abstract: article && article.abstract ? article.abstract : dataset.articleAbstract || '',
+      arxivId: article && article.arxiv_id ? article.arxiv_id : dataset.articleId || '',
+      pdfUrl: article && article.pdf_url ? article.pdf_url : dataset.articlePdf || '',
+    };
+    return details;
+  }
+})();
 
   </script>
 </body>

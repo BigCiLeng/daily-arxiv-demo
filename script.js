@@ -15,6 +15,7 @@
     { key: 'authors', label: 'Title & authors' },
     { key: 'full', label: 'Full details' },
   ];
+  let modalHandlersBound = false;
 
   const SOURCE_KEYS = Object.keys(RAW_DATA.sources || {});
   if (!SOURCE_KEYS.length) {
@@ -28,8 +29,9 @@
     preferences: loadStoredPreferences(),
     isEditingPreferences: false,
     activeSection: 'stats',
-    displayMode: loadStoredDisplayMode(),
+    displayMode: loadStoredDisplayMode() || 'authors',
     expandedArticles: new Set(),
+    lastModalTrigger: null,
   };
 
   if (!RAW_DATA.sources[state.source]) {
@@ -64,10 +66,22 @@
     headerGenerated: document.getElementById('meta-generated'),
     headerTotal: document.getElementById('meta-total'),
     footerSource: document.getElementById('footer-source'),
+    abstractModal: document.getElementById('abstract-modal'),
+    abstractModalClose: document.getElementById('abstract-modal-close'),
+    abstractModalTitle: document.getElementById('abstract-modal-title'),
+    abstractModalBody: document.getElementById('abstract-modal-body'),
+    abstractModalId: document.getElementById('abstract-modal-id'),
+    abstractModalAuthors: document.getElementById('abstract-modal-authors'),
+    abstractModalSubjects: document.getElementById('abstract-modal-subjects'),
+    abstractModalAbstract: document.getElementById('abstract-modal-abstract'),
+    abstractModalOriginal: document.getElementById('abstract-modal-original'),
+    abstractModalPdf: document.getElementById('abstract-modal-pdf'),
   };
 
+  document.addEventListener('click', handleQuickViewClick);
   document.addEventListener('click', handlePaperClick);
   document.addEventListener('keydown', handlePaperKeydown);
+  document.addEventListener('keydown', handleGlobalKeydown);
 
   if (elements.editPreferences) {
     elements.editPreferences.addEventListener('click', () => {
@@ -140,6 +154,7 @@
     renderNavigation(sourceData, overviewCount, favoriteCount, keywordCount, categoriesNavItems);
     updateFooter(sourceData);
     attachSectionHandlers();
+    attachModalHandlers();
     setActiveSection(state.activeSection);
     updatePaperAria();
   }
@@ -478,10 +493,22 @@
     });
   }
 
+  function handleQuickViewClick(event) {
+    const button = event.target.closest('.js-view-abstract');
+    if (!button) return;
+    const articleId = button.getAttribute('data-article-id') || '';
+    const details = buildModalDetails(articleId, button);
+    if (!details.url && !details.title) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openAbstractModal(details, button);
+  }
+
   function handlePaperClick(event) {
     const paper = event.target.closest('.paper');
     if (!paper) return;
     if (event.target.closest('a')) return;
+    if (event.target.closest('.js-view-abstract')) return;
     togglePaperExpansion(paper);
   }
 
@@ -504,6 +531,100 @@
       state.expandedArticles.add(paperId);
     }
     updatePaperAria();
+  }
+
+  function attachModalHandlers() {
+    if (modalHandlersBound) return;
+    modalHandlersBound = true;
+    if (elements.abstractModalClose) {
+      elements.abstractModalClose.addEventListener('click', () => closeAbstractModal());
+    }
+    if (elements.abstractModal) {
+      elements.abstractModal.addEventListener('click', (event) => {
+        if (event.target && event.target.getAttribute('data-modal-dismiss') === 'true') {
+          closeAbstractModal();
+        }
+      });
+    }
+  }
+
+  function handleGlobalKeydown(event) {
+    if (event.key === 'Escape' && isModalOpen()) {
+      event.preventDefault();
+      closeAbstractModal();
+    }
+  }
+
+  function isModalOpen() {
+    return Boolean(elements.abstractModal && elements.abstractModal.classList.contains('is-open'));
+  }
+
+  function openAbstractModal(details, trigger) {
+    if (!elements.abstractModal) return;
+    state.lastModalTrigger = trigger || null;
+    const resolvedTitle = decodeHtml(details.title) || 'Preview abstract';
+    const resolvedUrl = decodeHtml(details.url);
+    const resolvedAuthors = decodeHtml(details.authors);
+    const resolvedSubjects = decodeHtml(details.subjects);
+    const resolvedAbstract = decodeHtml(details.abstract);
+    const resolvedId = decodeHtml(details.arxivId);
+    const resolvedPdf = decodeHtml(details.pdfUrl);
+    elements.abstractModal.classList.add('is-open');
+    elements.abstractModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    if (elements.abstractModalClose) {
+      elements.abstractModalClose.focus();
+    }
+    if (elements.abstractModalTitle) {
+      elements.abstractModalTitle.textContent = resolvedTitle;
+    }
+    if (elements.abstractModalBody) {
+      elements.abstractModalBody.scrollTop = 0;
+    }
+    if (elements.abstractModalId) {
+      elements.abstractModalId.textContent = resolvedId ? `ID: ${resolvedId}` : '';
+      elements.abstractModalId.hidden = !resolvedId;
+    }
+    if (elements.abstractModalAuthors) {
+      elements.abstractModalAuthors.textContent = resolvedAuthors ? `Authors: ${resolvedAuthors}` : '';
+      elements.abstractModalAuthors.hidden = !resolvedAuthors;
+    }
+    if (elements.abstractModalSubjects) {
+      elements.abstractModalSubjects.textContent = resolvedSubjects ? `Subjects: ${resolvedSubjects}` : '';
+      elements.abstractModalSubjects.hidden = !resolvedSubjects;
+    }
+    if (elements.abstractModalAbstract) {
+      elements.abstractModalAbstract.textContent = resolvedAbstract || 'No abstract available.';
+    }
+    if (elements.abstractModalOriginal) {
+      if (resolvedUrl) {
+        elements.abstractModalOriginal.href = resolvedUrl;
+        elements.abstractModalOriginal.hidden = false;
+      } else {
+        elements.abstractModalOriginal.href = '#';
+        elements.abstractModalOriginal.hidden = true;
+      }
+    }
+    if (elements.abstractModalPdf) {
+      if (resolvedPdf) {
+        elements.abstractModalPdf.href = resolvedPdf;
+        elements.abstractModalPdf.hidden = false;
+      } else {
+        elements.abstractModalPdf.href = '#';
+        elements.abstractModalPdf.hidden = true;
+      }
+    }
+  }
+
+  function closeAbstractModal() {
+    if (!elements.abstractModal) return;
+    elements.abstractModal.classList.remove('is-open');
+    elements.abstractModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+    if (state.lastModalTrigger && typeof state.lastModalTrigger.focus === 'function') {
+      state.lastModalTrigger.focus();
+    }
+    state.lastModalTrigger = null;
   }
 
   function setSectionState(section, expanded) {
@@ -532,23 +653,27 @@
 
   function renderArticleCard(article) {
     const articleId = String(article.arxiv_id || article.id || '');
+    const title = escapeHtml(article.title);
     const authors = escapeHtml((article.authors || []).join(', '));
     const subjects = escapeHtml((article.subjects || []).join('; '));
     const abstract = escapeHtml(article.abstract);
-    const pdfLink = article.pdf_url ? `<a href="${article.pdf_url}" target="_blank" rel="noopener">PDF</a>` : '';
+    const absUrl = escapeHtml(article.abs_url);
+    const pdfUrl = article.pdf_url ? escapeHtml(article.pdf_url) : '';
+    const pdfLink = pdfUrl ? `<a href="${pdfUrl}" target="_blank" rel="noopener">PDF</a>` : '';
+    const quickViewButton = `<button type="button" class="link-button quick-view-button js-view-abstract" data-abs-url="${absUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}">Quick view</button>`;
+    const linkItems = [`<a href="${absUrl}" target="_blank" rel="noopener">Abstract</a>`, pdfLink].filter(Boolean).join(' ');
     const isUserExpanded = state.expandedArticles.has(articleId);
     const ariaExpanded = state.displayMode === 'full' || isUserExpanded;
     const expandedClass = isUserExpanded ? ' paper--expanded' : '';
     return `
       <article class="paper${expandedClass}" data-paper-id="${escapeHtml(articleId)}" tabindex="0" aria-expanded="${ariaExpanded}">
-        <h3><a href="${article.abs_url}" target="_blank" rel="noopener">${escapeHtml(article.title)}</a></h3>
+        <h3><a href="${absUrl}" target="_blank" rel="noopener">${title}</a>${quickViewButton}</h3>
         <p class="meta">
           <span class="id">${escapeHtml(article.arxiv_id)}</span>
           <span class="authors">${authors}</span>
         </p>
         <p class="subjects">${subjects}</p>
-        <p class="abstract">${abstract}</p>
-        <p class="links"><a href="${article.abs_url}" target="_blank" rel="noopener">Abstract</a> ${pdfLink}</p>
+        <p class="links">${linkItems}</p>
       </article>
     `;
   }
@@ -691,9 +816,9 @@
   function loadStoredDisplayMode() {
     try {
       const stored = localStorage.getItem(DISPLAY_MODE_STORAGE_KEY);
-      return normalizeDisplayMode(stored);
+      return stored ? normalizeDisplayMode(stored) : '';
     } catch (_) {
-      return 'full';
+      return '';
     }
   }
 
@@ -730,6 +855,33 @@
     try {
       localStorage.setItem(PREF_STORAGE_KEY, JSON.stringify(prefs));
     } catch (_) {}
+  }
+
+  function decodeHtml(value) {
+    if (!value) return '';
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = value;
+    return textarea.value;
+  }
+
+  function buildModalDetails(articleId, button) {
+    const sourceData = RAW_DATA.sources[state.source] || {};
+    const articles = Array.isArray(sourceData.articles) ? sourceData.articles : [];
+    const article = articleId ? articles.find((item) => {
+      const id = String(item.arxiv_id || item.id || '');
+      return id === articleId;
+    }) : null;
+    const dataset = button.dataset || {};
+    const details = {
+      title: article && article.title ? article.title : dataset.articleTitle || '',
+      url: article && article.abs_url ? article.abs_url : dataset.absUrl || '',
+      authors: Array.isArray(article && article.authors) ? article.authors.join(', ') : dataset.articleAuthors || '',
+      subjects: Array.isArray(article && article.subjects) ? article.subjects.join('; ') : dataset.articleSubjects || '',
+      abstract: article && article.abstract ? article.abstract : dataset.articleAbstract || '',
+      arxivId: article && article.arxiv_id ? article.arxiv_id : dataset.articleId || '',
+      pdfUrl: article && article.pdf_url ? article.pdf_url : dataset.articlePdf || '',
+    };
+    return details;
   }
 })();
 
