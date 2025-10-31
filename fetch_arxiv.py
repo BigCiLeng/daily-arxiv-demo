@@ -1774,12 +1774,55 @@ def main() -> None:
     redirect_html = dedent(
         f"""
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
-          <meta http-equiv="refresh" content="0; url={dated_filename.name}">
+          <meta charset="utf-8" />
+          <title>Loading Digest...</title>
+          <script>
+            (function() {{
+              const target = "{dated_filename.name}";
+
+              function injectLatest(html) {{
+                history.replaceState(null, "", "index.html");
+                document.open();
+                document.write(html);
+                document.close();
+              }}
+
+              function showFallback() {{
+                const status = document.getElementById("digest-status");
+                if (!status) {{
+                  return;
+                }}
+                const link = document.createElement("a");
+                link.href = target;
+                link.textContent = target;
+                status.textContent = "Latest digest: ";
+                status.appendChild(link);
+              }}
+
+              if (!window.fetch) {{
+                window.location.href = target;
+                return;
+              }}
+
+              fetch(target, {{ credentials: "same-origin", cache: "no-store" }})
+                .then(function(response) {{
+                  if (!response.ok) {{
+                    throw new Error("Failed to load latest digest");
+                  }}
+                  return response.text();
+                }})
+                .then(injectLatest)
+                .catch(function(error) {{
+                  console.error(error);
+                  showFallback();
+                }});
+            }})();
+          </script>
         </head>
         <body>
-          <p>Redirecting...</p>
+          <p id="digest-status">Loading latest digest...</p>
         </body>
         </html>
         """
