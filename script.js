@@ -73,6 +73,7 @@
     abstractModalId: document.getElementById('abstract-modal-id'),
     abstractModalAuthors: document.getElementById('abstract-modal-authors'),
     abstractModalSubjects: document.getElementById('abstract-modal-subjects'),
+    abstractModalSummary: document.getElementById('abstract-modal-summary'),
     abstractModalAbstract: document.getElementById('abstract-modal-abstract'),
     abstractModalOriginal: document.getElementById('abstract-modal-original'),
     abstractModalPdf: document.getElementById('abstract-modal-pdf'),
@@ -566,6 +567,7 @@
     const resolvedUrl = decodeHtml(details.url);
     const resolvedAuthors = decodeHtml(details.authors);
     const resolvedSubjects = decodeHtml(details.subjects);
+    const resolvedSummary = decodeHtml(details.summary);
     const resolvedAbstract = decodeHtml(details.abstract);
     const resolvedId = decodeHtml(details.arxivId);
     const resolvedPdf = decodeHtml(details.pdfUrl);
@@ -592,6 +594,10 @@
     if (elements.abstractModalSubjects) {
       elements.abstractModalSubjects.textContent = resolvedSubjects ? `Subjects: ${resolvedSubjects}` : '';
       elements.abstractModalSubjects.hidden = !resolvedSubjects;
+    }
+    if (elements.abstractModalSummary) {
+      elements.abstractModalSummary.textContent = resolvedSummary ? `Summary: ${resolvedSummary}` : '';
+      elements.abstractModalSummary.hidden = !resolvedSummary;
     }
     if (elements.abstractModalAbstract) {
       elements.abstractModalAbstract.textContent = resolvedAbstract || 'No abstract available.';
@@ -657,10 +663,11 @@
     const authors = escapeHtml((article.authors || []).join(', '));
     const subjects = escapeHtml((article.subjects || []).join('; '));
     const abstract = escapeHtml(article.abstract);
+    const summary = escapeHtml(article.summary || '');
     const absUrl = escapeHtml(article.abs_url);
     const pdfUrl = article.pdf_url ? escapeHtml(article.pdf_url) : '';
     const pdfLink = pdfUrl ? `<a href="${pdfUrl}" target="_blank" rel="noopener">PDF</a>` : '';
-    const quickViewButton = `<button type="button" class="link-button quick-view-button js-view-abstract" data-abs-url="${absUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}">Quick view</button>`;
+    const quickViewButton = `<button type="button" class="link-button quick-view-button js-view-abstract" data-abs-url="${absUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-summary="${summary}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}">Quick view</button>`;
     const keywords = Array.isArray(article.keywords) ? article.keywords : [];
     const keywordBadges = keywords.length
       ? `<span class="keyword-tags">${keywords.map((keyword) => `<span class="keyword-tag">${escapeHtml(keyword)}</span>`).join('')}</span>`
@@ -669,6 +676,9 @@
     const isUserExpanded = state.expandedArticles.has(articleId);
     const ariaExpanded = state.displayMode === 'full' || isUserExpanded;
     const expandedClass = isUserExpanded ? ' paper--expanded' : '';
+    const summaryBlock = summary
+      ? `<p class="summary">${summary}</p>`
+      : '';
     return `
       <article class="paper${expandedClass}" data-paper-id="${escapeHtml(articleId)}" tabindex="0" aria-expanded="${ariaExpanded}">
         <h3><a href="${absUrl}" target="_blank" rel="noopener">${title}</a>${keywordBadges}${quickViewButton}</h3>
@@ -676,6 +686,7 @@
           <span class="id">${escapeHtml(article.arxiv_id)}</span>
           <span class="authors">${authors}</span>
         </p>
+        ${summaryBlock}
         <p class="subjects">${subjects}</p>
         <p class="links">${linkItems}</p>
       </article>
@@ -888,6 +899,7 @@
       authors: Array.isArray(article && article.authors) ? article.authors.join(', ') : dataset.articleAuthors || '',
       subjects: Array.isArray(article && article.subjects) ? article.subjects.join('; ') : dataset.articleSubjects || '',
       abstract: article && article.abstract ? article.abstract : dataset.articleAbstract || '',
+      summary: article && article.summary ? article.summary : dataset.articleSummary || '',
       arxivId: article && article.arxiv_id ? article.arxiv_id : dataset.articleId || '',
       pdfUrl: article && article.pdf_url ? article.pdf_url : dataset.articlePdf || '',
     };

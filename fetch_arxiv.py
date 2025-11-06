@@ -50,7 +50,7 @@ DEFAULT_CONFIG = {
     "keywords": [],
 }
 DETAIL_ABSTRACT_CACHE: Dict[str, str] = {}
-KEYWORD_CACHE: Dict[str, List[str]] = {}
+ARTICLE_INSIGHT_CACHE: Dict[str, Tuple[List[str], str]] = {}
 
 # KEYWORD_API_URL = os.getenv("OPENROUTER_API_URL", "https://openrouter.ai/api/v1/chat/completions")
 # KEYWORD_API_KEY = os.getenv("OPENROUTER_API_KEY", "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").strip()
@@ -239,6 +239,7 @@ class Article:
     section_type: str
     submission_date: datetime
     keywords: List[str] = field(default_factory=list)
+    summary: str = ""
 
 
 def load_config(path: Path) -> Dict[str, List[str]]:
@@ -385,7 +386,7 @@ def extract_article(dt_tag, dd_tag, section_type: str, section_date: date, sessi
     full_abstract = fetch_full_abstract(abs_url, session)
     if full_abstract:
         abstract = full_abstract
-    keywords = fetch_keywords_for_abstract(abstract, session)
+    keywords, summary = fetch_keywords_and_summary(abstract, session)
 
     subjects_div = dd_tag.find("div", class_="list-subjects")
     subjects_text = clean_descriptor_text(subjects_div, "Subjects:")
@@ -405,6 +406,7 @@ def extract_article(dt_tag, dd_tag, section_type: str, section_date: date, sessi
         section_type=section_type,
         submission_date=datetime.combine(section_date, datetime.min.time()).replace(tzinfo=timezone.utc),
         keywords=keywords,
+        summary=summary,
     )
 
 
@@ -431,28 +433,34 @@ def fetch_full_abstract(abs_url: str, session: requests.Session) -> str:
     return text
 
 
-def fetch_keywords_for_abstract(abstract: str, session: requests.Session) -> List[str]:
+def fetch_keywords_and_summary(abstract: str, session: requests.Session) -> Tuple[List[str], str]:
+    fallback_summary = summarize_locally(abstract)
     if not abstract or not KEYWORD_API_KEY or not KEYWORD_API_URL:
-        return []
+        return [], fallback_summary
 
     cache_key = abstract.strip()
-    if cache_key in KEYWORD_CACHE:
-        return KEYWORD_CACHE[cache_key]
+    if cache_key in ARTICLE_INSIGHT_CACHE:
+        keywords_cached, summary_cached = ARTICLE_INSIGHT_CACHE[cache_key]
+        return keywords_cached, summary_cached or fallback_summary
 
     prompt = dedent(
         """
-        Extract the two most informative keywords (single words or short noun phrases) from the research abstract below.
-        Respond with a JSON object of the form {{"keywords": ["keyword 1", "keyword 2"]}} using at most two items.
+        From the research abstract below, do the following:
+        1. Extract up to {keyword_count} of the most informative keywords (single words or short noun phrases).
+        2. Write one concise English sentence (max 30 words) summarizing the paper's main contribution.
+
+        Respond with valid JSON using this shape:
+        {{"keywords": ["keyword 1", "keyword 2"], "summary": "One-sentence summary."}}
 
         Abstract:
         {abstract}
         """
-    ).strip().format(abstract=abstract.strip())
+    ).strip().format(abstract=abstract.strip(), keyword_count=KEYWORD_TARGET_COUNT)
 
     payload = {
         "model": KEYWORD_API_MODEL,
         "messages": [
-            {"role": "system", "content": "You extract concise research keywords."},
+            {"role": "system", "content": "You analyze arXiv abstracts and return keywords plus a single-sentence summary."},
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.2,
@@ -478,11 +486,11 @@ def fetch_keywords_for_abstract(abstract: str, session: requests.Session) -> Lis
             data = response.json()
             break
         except (requests.RequestException, ValueError) as exc:
-            print(f"Warning: keyword API attempt {attempt} failed: {exc}")
+            print(f"Warning: keyword/summary API attempt {attempt} failed: {exc}")
             data = None
     if not data:
-        KEYWORD_CACHE[cache_key] = []
-        return []
+        ARTICLE_INSIGHT_CACHE[cache_key] = ([], fallback_summary)
+        return [], fallback_summary
 
     content = (
         data.get("choices", [{}])[0]
@@ -491,8 +499,9 @@ def fetch_keywords_for_abstract(abstract: str, session: requests.Session) -> Lis
         .strip()
     )
     keywords = parse_keywords_response(content)[:KEYWORD_TARGET_COUNT]
-    KEYWORD_CACHE[cache_key] = keywords
-    return keywords
+    summary = parse_summary_response(content) or fallback_summary
+    ARTICLE_INSIGHT_CACHE[cache_key] = (keywords, summary)
+    return keywords, summary
 
 
 def parse_keywords_response(content: str) -> List[str]:
@@ -526,6 +535,42 @@ def parse_keywords_response(content: str) -> List[str]:
             break
 
     return unique_keywords
+
+
+def parse_summary_response(content: str) -> str:
+    if not content:
+        return ""
+
+    parsed = None
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", content, re.DOTALL)
+        if match:
+            try:
+                parsed = json.loads(match.group(0))
+            except json.JSONDecodeError:
+                parsed = None
+
+    if isinstance(parsed, dict):
+        summary = parsed.get("summary")
+        if isinstance(summary, str):
+            return summary.strip()
+    return ""
+
+
+def summarize_locally(abstract: str) -> str:
+    if not abstract:
+        return ""
+    normalized = " ".join(abstract.strip().split())
+    if not normalized:
+        return ""
+    sentences = re.split(r"(?<=[.!?])\s+", normalized)
+    summary = next((sentence.strip() for sentence in sentences if sentence.strip()), normalized)
+    words = summary.split()
+    if len(words) > 35:
+        summary = " ".join(words[:35]).rstrip(",.;: ") + "…"
+    return summary
 
 
 def clean_descriptor_text(tag, descriptor_prefix: str) -> str:
@@ -616,6 +661,7 @@ def article_to_dict(article: Article) -> Dict[str, object]:
         "section_type": article.section_type,
         "submission_date": article.submission_date.date().isoformat(),
         "keywords": article.keywords,
+        "summary": article.summary,
     }
 
 
@@ -1107,6 +1153,11 @@ def build_html(payload: Dict[str, object]) -> str:
       color: var(--text-secondary);
       margin-bottom: 10px;
     }
+    .paper .summary {
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      margin: 2px 0 10px;
+    }
     .paper .meta .id {
       font-weight: 600;
       color: var(--brand);
@@ -1166,6 +1217,7 @@ def build_html(payload: Dict[str, object]) -> str:
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 16px 32px rgba(37, 99, 235, 0.18);
     }
     body.display-mode-title .paper:not(.paper--expanded) .meta,
+    body.display-mode-title .paper:not(.paper--expanded) .summary,
     body.display-mode-title .paper:not(.paper--expanded) .subjects,
     body.display-mode-title .paper:not(.paper--expanded) .abstract {
       display: none;
@@ -1320,6 +1372,10 @@ def build_html(payload: Dict[str, object]) -> str:
     }
     .abstract-modal__subjects {
       flex: 1 1 100%;
+    }
+    .abstract-modal__summary {
+      flex: 1 1 100%;
+      color: var(--text-primary);
     }
     .abstract-modal__abstract {
       font-size: 0.95rem;
@@ -1647,6 +1703,7 @@ def build_html(payload: Dict[str, object]) -> str:
           <span class="abstract-modal__id" id="abstract-modal-id"></span>
           <span class="abstract-modal__authors" id="abstract-modal-authors"></span>
           <span class="abstract-modal__subjects" id="abstract-modal-subjects"></span>
+          <span class="abstract-modal__summary" id="abstract-modal-summary" hidden></span>
         </div>
         <div class="abstract-modal__abstract" id="abstract-modal-abstract"></div>
         <div class="abstract-modal__actions">
