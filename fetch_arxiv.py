@@ -168,6 +168,15 @@ STOPWORDS = {
 }
 
 PHRASE_MAX_WORDS = 4
+JSONISH_REPLACEMENTS = {
+    "；": ",",
+    "，": ",",
+    "：": ":",
+    "“": '"',
+    "”": '"',
+    "’": "'",
+    "‘": "'",
+}
 
 
 def split_long_phrase(words: List[str], max_words: int) -> List[List[str]]:
@@ -508,20 +517,61 @@ def parse_keywords_response(content: str) -> List[str]:
     if not content:
         return []
 
+    def _strip_code_fences(text: str) -> str:
+        trimmed = text.strip()
+        if trimmed.startswith("```"):
+            trimmed = re.sub(r"^```(?:json)?", "", trimmed, flags=re.IGNORECASE).strip()
+            if "```" in trimmed:
+                trimmed = trimmed.rsplit("```", 1)[0].strip()
+        return trimmed
+
+    def _normalize_jsonish_text(text: str) -> str:
+        normalized = _strip_code_fences(text)
+        for src, dst in JSONISH_REPLACEMENTS.items():
+            normalized = normalized.replace(src, dst)
+        return normalized
+
+    def _extract_keywords_from_dict(data: Dict[str, object]) -> List[str]:
+        for key, value in data.items():
+            if key.lower() == "keywords":
+                if isinstance(value, list):
+                    return [str(item).strip() for item in value if str(item).strip()]
+                if isinstance(value, str):
+                    return [part.strip() for part in re.split(r"[;,]", value) if part.strip()]
+        return []
+
+    def _attempt_json_load(text: str):
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            match = re.search(r"\{.*\}", text, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(0))
+                except json.JSONDecodeError:
+                    return None
+        return None
+
+    normalized_content = _normalize_jsonish_text(content)
     candidates: List[str] = []
-    try:
-        parsed = json.loads(content)
-        if isinstance(parsed, dict):
-            values = parsed.get("keywords")
-            if isinstance(values, list):
-                candidates = [str(item).strip() for item in values if str(item).strip()]
-        elif isinstance(parsed, list):
-            candidates = [str(item).strip() for item in parsed if str(item).strip()]
-    except json.JSONDecodeError:
-        pass
+    parsed = _attempt_json_load(normalized_content)
+    if isinstance(parsed, dict):
+        candidates = _extract_keywords_from_dict(parsed)
+    elif isinstance(parsed, list):
+        candidates = [str(item).strip() for item in parsed if str(item).strip()]
 
     if not candidates:
-        parts = [part.strip(" •-\t") for part in re.split(r"[\n,;]+", content) if part.strip()]
+        keywords_block = re.search(r'"?keywords?"?\s*:\s*\[(.*?)\]', normalized_content, re.IGNORECASE | re.DOTALL)
+        if keywords_block:
+            block = keywords_block.group(1)
+            quoted_items = re.findall(r'"([^"]+)"', block)
+            if quoted_items:
+                candidates = [item.strip() for item in quoted_items if item.strip()]
+            else:
+                candidates = [part.strip(" \"'") for part in re.split(r"[;,]", block) if part.strip(" \"'")]
+
+    if not candidates:
+        parts = [part.strip(" •-\t") for part in re.split(r"[\n,;]+", normalized_content) if part.strip()]
         candidates = parts
 
     unique_keywords: List[str] = []
