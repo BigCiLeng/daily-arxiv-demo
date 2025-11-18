@@ -5,6 +5,7 @@
   const SOURCE_STORAGE_KEY = 'arxivDigestSource';
   const PREF_STORAGE_KEY = 'arxivDigestPreferences';
   const DISPLAY_MODE_STORAGE_KEY = 'arxivDigestDisplayMode';
+  const READ_LIST_STORAGE_KEY = 'arxivDigestReadList';
   const DISPLAY_MODE_CLASSES = {
     title: 'display-mode-title',
     authors: 'display-mode-authors',
@@ -32,6 +33,8 @@
     displayMode: loadStoredDisplayMode() || 'authors',
     expandedArticles: new Set(),
     lastModalTrigger: null,
+    readList: loadStoredReadList(),
+    readListEditingId: '',
   };
 
   if (!RAW_DATA.sources[state.source]) {
@@ -55,6 +58,12 @@
     resetPreferences: document.getElementById('reset-preferences'),
     preferencesStatusView: document.getElementById('preferences-status-view'),
     preferencesStatus: document.getElementById('preferences-status'),
+    dateSwitcher: document.getElementById('switch-date'),
+    readListBody: document.getElementById('read-list-body'),
+    readListCount: document.getElementById('read-list-count'),
+    readListClear: document.getElementById('read-list-clear'),
+    dateSwitcherForm: document.getElementById('date-switcher-form'),
+    dateSwitcherInput: document.getElementById('date-switcher-input'),
     overviewSummary: document.getElementById('overview-summary'),
     overviewBody: document.getElementById('overview-body'),
     statsBody: document.getElementById('stats-body'),
@@ -81,6 +90,7 @@
 
   document.addEventListener('click', handleQuickViewClick);
   document.addEventListener('click', handlePaperClick);
+  document.addEventListener('click', handleReadListClick);
   document.addEventListener('keydown', handlePaperKeydown);
   document.addEventListener('keydown', handleGlobalKeydown);
 
@@ -100,6 +110,33 @@
       state.isEditingPreferences = false;
       setStatus('');
       renderPreferencesPanel();
+    });
+  }
+
+  if (elements.dateSwitcherForm && elements.dateSwitcherInput) {
+    const sourceDate = (RAW_DATA.sources[state.source] && RAW_DATA.sources[state.source].date) || '';
+    if (sourceDate) {
+      elements.dateSwitcherInput.value = sourceDate;
+    }
+    elements.dateSwitcherForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const value = elements.dateSwitcherInput.value;
+      if (!value || !/^(\\d{4}-\\d{2}-\\d{2})$/.test(value)) {
+        window.alert('Please choose a date as YYYY-MM-DD.');
+        return;
+      }
+      const target = `index-${value}.html`;
+      window.location.href = target;
+    });
+  }
+
+  if (elements.readListClear) {
+    elements.readListClear.addEventListener('click', () => {
+      state.readList = [];
+      state.readListEditingId = '';
+      saveReadList(state.readList);
+      renderReadList();
+      updateReadListButtons();
     });
   }
 
@@ -137,6 +174,7 @@
     renderSourceButtons();
     renderDisplayModeControls();
     renderPreferencesPanel();
+    renderReadList();
 
     const sourceData = RAW_DATA.sources[state.source];
     if (!sourceData) {
@@ -147,17 +185,18 @@
     pruneExpandedArticles(articles);
     applyDisplayModeClass();
     updateHeader(sourceData);
+    updateDateSwitcher(sourceData);
     const overviewCount = renderOverview(sourceData, articles);
     renderStats(sourceData);
     const favoriteCount = renderFavorites(sourceData, articles);
     const keywordCount = renderKeywords(sourceData, articles);
-    const categoriesNavItems = renderCategories(sourceData, articles);
-    renderNavigation(sourceData, overviewCount, favoriteCount, keywordCount, categoriesNavItems);
+    renderNavigation(sourceData, overviewCount, favoriteCount, keywordCount);
     updateFooter(sourceData);
     attachSectionHandlers();
     attachModalHandlers();
     setActiveSection(state.activeSection);
     updatePaperAria();
+    updateReadListButtons();
   }
 
   function renderSourceButtons() {
@@ -254,6 +293,24 @@
       if (elements.preferencesView) elements.preferencesView.hidden = false;
       if (elements.preferencesForm) elements.preferencesForm.hidden = true;
     }
+  }
+
+  function renderReadList() {
+    const container = elements.readListBody;
+    const items = state.readList || [];
+    if (elements.readListCount) {
+      elements.readListCount.textContent = String(items.length);
+    }
+    if (elements.readListClear) {
+      elements.readListClear.disabled = items.length === 0;
+    }
+    if (!container) return;
+    if (!items.length) {
+      container.innerHTML = '<p class="empty-state">No papers saved yet.</p>';
+      return;
+    }
+    const sorted = [...items].sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+    container.innerHTML = sorted.map((item, index) => renderReadListItem(item, index)).join('');
   }
 
   function renderOverview(sourceData, articles) {
@@ -383,14 +440,14 @@
     }));
   }
 
-  function renderNavigation(sourceData, overviewCount, favoriteCount, keywordCount, categoriesNavItems) {
+  function renderNavigation(sourceData, overviewCount, favoriteCount, keywordCount) {
     if (!elements.nav) return;
     const navItems = [
+      { id: 'workspace', label: 'Workspace' },
       { id: 'stats', label: 'Statistics' },
       { id: 'overview', label: `All Papers (${overviewCount})` },
       { id: 'favorite', label: `Favorite Authors (${favoriteCount})` },
       { id: 'keyword', label: `Watched Keywords (${keywordCount})` },
-      { id: 'categories', label: 'Browse by Category', children: categoriesNavItems },
     ];
     elements.nav.innerHTML = buildNavList(navItems);
   }
@@ -410,6 +467,13 @@
     if (elements.headerDate) elements.headerDate.textContent = `Date: ${sourceData.date || ''}`;
     if (elements.headerGenerated) elements.headerGenerated.textContent = `Generated at: ${generatedAt}`;
     if (elements.headerTotal) elements.headerTotal.textContent = `Total papers: ${(sourceData.stats && sourceData.stats.total) || 0}`;
+  }
+
+  function updateDateSwitcher(sourceData) {
+    if (!elements.dateSwitcherInput) return;
+    if (sourceData && sourceData.date) {
+      elements.dateSwitcherInput.value = sourceData.date;
+    }
   }
 
   function updateFooter(sourceData) {
@@ -459,6 +523,10 @@
     state.activeSection = sectionId || 'stats';
     const sections = Array.from(document.querySelectorAll('.content-section'));
     sections.forEach((section) => {
+      if (section.dataset.staticSection === 'true') {
+        section.classList.remove('is-hidden', 'is-collapsed');
+        return;
+      }
       const isActive = section.id === state.activeSection;
       section.classList.toggle('is-hidden', !isActive);
       if (section.dataset.collapsible === 'true') {
@@ -510,6 +578,7 @@
     if (!paper) return;
     if (event.target.closest('a')) return;
     if (event.target.closest('.js-view-abstract')) return;
+    if (event.target.closest('.js-readlist-toggle')) return;
     togglePaperExpansion(paper);
   }
 
@@ -520,6 +589,7 @@
     if (event.key === ' ') {
       event.preventDefault();
     }
+    if (event.target.closest('.js-readlist-toggle')) return;
     togglePaperExpansion(paper);
   }
 
@@ -532,6 +602,65 @@
       state.expandedArticles.add(paperId);
     }
     updatePaperAria();
+  }
+
+  function handleReadListClick(event) {
+    const toggleButton = event.target.closest('.js-readlist-toggle');
+    if (toggleButton) {
+      const articleId = toggleButton.getAttribute('data-article-id') || '';
+      if (!articleId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (isInReadList(articleId)) {
+        removeFromReadList(articleId);
+      } else {
+        const details = buildModalDetails(articleId, toggleButton);
+        const sourceLabel = (RAW_DATA.sources[state.source] && RAW_DATA.sources[state.source].label) || state.source;
+        addToReadList({
+          id: articleId,
+          title: decodeHtml(details.title) || articleId,
+          absUrl: decodeHtml(details.url),
+          pdfUrl: decodeHtml(details.pdfUrl),
+          authors: decodeHtml(details.authors),
+          source: sourceLabel,
+        });
+      }
+      return;
+    }
+
+    const removeButton = event.target.closest('[data-readlist-remove]');
+    if (removeButton) {
+      const targetId = removeButton.getAttribute('data-readlist-remove') || '';
+      if (targetId) {
+        removeFromReadList(targetId);
+      }
+      return;
+    }
+
+    const editButton = event.target.closest('[data-readlist-edit]');
+    if (editButton) {
+      const targetId = editButton.getAttribute('data-readlist-edit') || '';
+      state.readListEditingId = targetId;
+      renderReadList();
+      return;
+    }
+
+    const cancelButton = event.target.closest('[data-readlist-cancel]');
+    if (cancelButton) {
+      state.readListEditingId = '';
+      renderReadList();
+      return;
+    }
+
+    const saveButton = event.target.closest('[data-readlist-save]');
+    if (saveButton) {
+      const targetId = saveButton.getAttribute('data-readlist-save') || '';
+      if (!targetId) return;
+      const selector = `[data-readlist-note-input="${targetId}"]`;
+      const noteInput = elements.readListBody ? elements.readListBody.querySelector(selector) : null;
+      const note = noteInput ? noteInput.value : '';
+      updateReadListNote(targetId, note);
+    }
   }
 
   function attachModalHandlers() {
@@ -668,6 +797,10 @@
     const pdfUrl = article.pdf_url ? escapeHtml(article.pdf_url) : '';
     const pdfLink = pdfUrl ? `<a href="${pdfUrl}" target="_blank" rel="noopener">PDF</a>` : '';
     const quickViewButton = `<button type="button" class="link-button quick-view-button js-view-abstract" data-abs-url="${absUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-summary="${summary}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}">Quick view</button>`;
+    const inReadList = isInReadList(articleId);
+    const readListLabel = inReadList ? 'In read list' : 'Add to read list';
+    const readListActiveClass = inReadList ? ' is-active' : '';
+    const readListButton = `<button type="button" class="link-button readlist-toggle js-readlist-toggle${readListActiveClass}" data-abs-url="${absUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-summary="${summary}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}" aria-pressed="${inReadList}">${readListLabel}</button>`;
     const keywords = Array.isArray(article.keywords) ? article.keywords : [];
     const keywordBadges = keywords.length
       ? `<span class="keyword-tags">${keywords.map((keyword) => `<span class="keyword-tag">${escapeHtml(keyword)}</span>`).join('')}</span>`
@@ -681,7 +814,7 @@
       : '';
     return `
       <article class="paper${expandedClass}" data-paper-id="${escapeHtml(articleId)}" tabindex="0" aria-expanded="${ariaExpanded}">
-        <h3><a href="${absUrl}" target="_blank" rel="noopener">${title}</a>${keywordBadges}${quickViewButton}</h3>
+        <h3><a href="${absUrl}" target="_blank" rel="noopener">${title}</a>${keywordBadges}${quickViewButton}${readListButton}</h3>
         <p class="meta">
           <span class="id">${escapeHtml(article.arxiv_id)}</span>
           <span class="authors">${authors}</span>
@@ -690,6 +823,24 @@
         <p class="subjects">${subjects}</p>
         <p class="links">${linkItems}</p>
       </article>
+    `;
+  }
+
+  function renderReadListItem(item, index) {
+    const rawId = String(item.id || '');
+    const id = escapeHtml(rawId);
+    const title = escapeHtml(item.title || rawId);
+    const absUrl = escapeHtml(item.absUrl || item.url || '#');
+    const deleteButton = `<button type="button" class="readlist-action readlist-action--danger readlist-action--inline readlist-action--dot" data-readlist-remove="${id}" aria-label="Delete from read list">D</button>`;
+    const titleLabel = `${index + 1}. `;
+    return `
+      <div class="readlist-item" data-readlist-id="${id}">
+        <div class="readlist-item__title-row">
+          <div class="readlist-title">
+            ${deleteButton}<span class="readlist-index">${titleLabel}</span><a href="${absUrl}" target="_blank" rel="noopener">${title}</a>
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -727,6 +878,59 @@
           subjects,
         };
       });
+  }
+
+  function addToReadList(entry) {
+    const [normalized] = normalizeReadListItems([entry]);
+    if (!normalized) return;
+    const next = state.readList.filter((item) => item.id !== normalized.id);
+    next.push(normalized);
+    state.readListEditingId = '';
+    setReadList(next);
+  }
+
+  function removeFromReadList(id) {
+    const next = state.readList.filter((item) => item.id !== id);
+    if (state.readListEditingId === id) {
+      state.readListEditingId = '';
+    }
+    setReadList(next);
+  }
+
+  function updateReadListNote(id, note) {
+    let changed = false;
+    const next = state.readList.map((item) => {
+      if (item.id !== id) return item;
+      changed = true;
+      return { ...item, note: String(note || '') };
+    });
+    if (!changed) return;
+    state.readListEditingId = '';
+    setReadList(next);
+  }
+
+  function setReadList(nextList) {
+    state.readList = normalizeReadListItems(nextList);
+    saveReadList(state.readList);
+    renderReadList();
+    updateReadListButtons();
+  }
+
+  function updateReadListButtons() {
+    const buttons = Array.from(document.querySelectorAll('.js-readlist-toggle'));
+    if (!buttons.length) return;
+    const ids = new Set(state.readList.map((item) => item.id));
+    buttons.forEach((button) => {
+      const id = button.getAttribute('data-article-id') || '';
+      const isActive = id && ids.has(id);
+      button.classList.toggle('is-active', Boolean(isActive));
+      button.setAttribute('aria-pressed', String(Boolean(isActive)));
+      button.textContent = isActive ? 'In read list' : 'Add to read list';
+    });
+  }
+
+  function isInReadList(articleId) {
+    return state.readList.some((item) => item.id === articleId);
   }
 
   function filterByFavoriteAuthors(articles, favoriteAuthors) {
@@ -834,6 +1038,25 @@
     };
   }
 
+  function normalizeReadListItems(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map((item) => {
+      const id = String(item && item.id ? item.id : '').trim();
+      const title = String(item && item.title ? item.title : '').trim() || id;
+      if (!id || !title) return null;
+      return {
+        id,
+        title,
+        absUrl: String(item && (item.absUrl || item.url) ? item.absUrl || item.url : '').trim(),
+        pdfUrl: String(item && item.pdfUrl ? item.pdfUrl : '').trim(),
+        authors: String(item && item.authors ? item.authors : '').trim(),
+        source: String(item && item.source ? item.source : '').trim(),
+        note: typeof (item && item.note) === 'string' ? item.note : '',
+        addedAt: Number(item && item.addedAt) || Date.now(),
+      };
+    }).filter(Boolean);
+  }
+
   function loadStoredDisplayMode() {
     try {
       const stored = localStorage.getItem(DISPLAY_MODE_STORAGE_KEY);
@@ -846,6 +1069,21 @@
   function saveDisplayMode(mode) {
     try {
       localStorage.setItem(DISPLAY_MODE_STORAGE_KEY, normalizeDisplayMode(mode));
+    } catch (_) {}
+  }
+
+  function loadStoredReadList() {
+    try {
+      const raw = localStorage.getItem(READ_LIST_STORAGE_KEY);
+      return raw ? normalizeReadListItems(JSON.parse(raw)) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function saveReadList(list) {
+    try {
+      localStorage.setItem(READ_LIST_STORAGE_KEY, JSON.stringify(normalizeReadListItems(list)));
     } catch (_) {}
   }
 

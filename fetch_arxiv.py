@@ -715,6 +715,87 @@ def article_to_dict(article: Article) -> Dict[str, object]:
     }
 
 
+def extract_payload_from_html(html_content: str) -> Dict[str, object]:
+    match = re.search(
+        r'<script type="application/json" id="digest-data">(.*?)</script>',
+        html_content,
+        re.DOTALL,
+    )
+    if not match:
+        raise ValueError("digest-data payload not found")
+    data = match.group(1)
+    return json.loads(data)
+
+
+def load_payload_from_file(path: Path) -> Dict[str, object]:
+    content = path.read_text(encoding="utf-8")
+    return extract_payload_from_html(content)
+
+
+def find_latest_digest(directory: Path) -> Path | None:
+    candidates = sorted(directory.glob("index-*.html"), reverse=True)
+    return candidates[0] if candidates else None
+
+
+def build_redirect_html(target_filename: str) -> str:
+    return dedent(
+        f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8" />
+          <title>Loading Digest...</title>
+          <script>
+            (function() {{
+              const target = "{target_filename}";
+
+              function injectLatest(html) {{
+                history.replaceState(null, "", "index.html");
+                document.open();
+                document.write(html);
+                document.close();
+              }}
+
+              function showFallback() {{
+                const status = document.getElementById("digest-status");
+                if (!status) {{
+                  return;
+                }}
+                const link = document.createElement("a");
+                link.href = target;
+                link.textContent = target;
+                status.textContent = "Latest digest: ";
+                status.appendChild(link);
+              }}
+
+              if (!window.fetch) {{
+                window.location.href = target;
+                return;
+              }}
+
+              fetch(target, {{ credentials: "same-origin", cache: "no-store" }})
+                .then(function(response) {{
+                  if (!response.ok) {{
+                    throw new Error("Failed to load latest digest");
+                  }}
+                  return response.text();
+                }})
+                .then(injectLatest)
+                .catch(function(error) {{
+                  console.error(error);
+                  showFallback();
+                }});
+            }})();
+          </script>
+        </head>
+        <body>
+          <p id="digest-status">Loading latest digest...</p>
+        </body>
+        </html>
+        """
+    ).strip()
+
+
 
 
 
@@ -868,6 +949,42 @@ def build_html(payload: Dict[str, object]) -> str:
       box-shadow: 0 6px 18px rgba(14, 116, 244, 0.35);
       transform: translateY(-1px);
     }
+    .date-switcher {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .date-switcher input[type="date"] {
+      appearance: none;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.08);
+      color: white;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .date-switcher button {
+      appearance: none;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.08);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+    .date-switcher button:hover,
+    .date-switcher button:focus,
+    .date-switcher input[type="date"]:hover,
+    .date-switcher input[type="date"]:focus {
+      background: rgba(37, 99, 235, 0.35);
+      border-color: rgba(96, 165, 250, 0.75);
+      outline: none;
+      transform: translateY(-1px);
+    }
     .layout {
       display: flex;
       gap: 32px;
@@ -890,6 +1007,12 @@ def build_html(payload: Dict[str, object]) -> str:
       gap: 18px;
       height: fit-content;
       max-height: calc(100vh - 48px);
+    }
+    .workspace-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      align-items: start;
     }
     .preferences-card {
       background: linear-gradient(140deg, rgba(37, 99, 235, 0.08), rgba(2, 132, 199, 0.1));
@@ -979,6 +1102,235 @@ def build_html(payload: Dict[str, object]) -> str:
     .preferences-actions button[type="submit"]:focus {
       transform: translateY(-1px);
       outline: none;
+    }
+    .readlist-card {
+      background: var(--bg-surface);
+      border-radius: 16px;
+      padding: 16px 18px;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 18px 32px rgba(15, 23, 42, 0.08);
+    }
+    .readlist-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .readlist-card h2 {
+      margin: 0;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-secondary);
+    }
+    .readlist-subtitle {
+      margin: 2px 0 0;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    .readlist-count-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    .readlist-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-weight: 700;
+    }
+    .readlist-clear {
+      appearance: none;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      background: rgba(255, 255, 255, 0.9);
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+    .readlist-clear:hover,
+    .readlist-clear:focus {
+      background: rgba(37, 99, 235, 0.08);
+      border-color: rgba(37, 99, 235, 0.4);
+      color: var(--brand);
+      transform: translateY(-1px);
+      outline: none;
+    }
+    .readlist-clear:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .readlist-body {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .readlist-item {
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      border-radius: 12px;
+      padding: 8px 10px;
+      background: linear-gradient(140deg, rgba(255, 255, 255, 0.92), rgba(241, 245, 249, 0.6));
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .readlist-item__title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    .readlist-title {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 4px;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .readlist-index {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+    .readlist-item a {
+      color: var(--brand);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .readlist-item a:hover,
+    .readlist-item a:focus {
+      text-decoration: underline;
+    }
+    .readlist-source {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.12);
+      color: var(--brand);
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    .readlist-authors {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    .readlist-note {
+      margin: 2px 0 0;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+    }
+    .readlist-note--empty {
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+    .readlist-note-input {
+      width: 100%;
+      min-height: 48px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      padding: 8px 10px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      resize: vertical;
+      background: rgba(255, 255, 255, 0.95);
+    }
+    .readlist-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 0.9rem;
+    }
+    .readlist-links a {
+      color: var(--brand);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .readlist-links a:hover,
+    .readlist-links a:focus {
+      text-decoration: underline;
+    }
+    .readlist-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .readlist-action {
+      padding: 6px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.55);
+      background: white;
+      color: var(--text-primary);
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+    .readlist-action.readlist-action--inline {
+      padding: 4px 10px;
+      font-size: 0.85rem;
+    }
+    .readlist-action--dot {
+      padding: 2px 6px;
+      min-width: 0;
+      border-radius: 999px;
+      background: var(--danger);
+      color: white;
+      border: none;
+      box-shadow: none;
+      line-height: 1;
+      font-size: 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .readlist-action--dot:hover,
+    .readlist-action--dot:focus {
+      transform: translateY(-1px);
+      box-shadow: none;
+      background: #b91c1c;
+      color: white;
+    }
+    .readlist-action:hover,
+    .readlist-action:focus {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+      border-color: rgba(37, 99, 235, 0.3);
+      color: var(--brand);
+      outline: none;
+    }
+    .readlist-action--primary {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: white;
+    }
+    .readlist-action--primary:hover,
+    .readlist-action--primary:focus {
+      box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28);
+      color: white;
+    }
+    .readlist-action--danger {
+      border-color: rgba(220, 38, 38, 0.4);
+      color: var(--danger);
+      background: rgba(220, 38, 38, 0.05);
+    }
+    .readlist-action--danger:hover,
+    .readlist-action--danger:focus {
+      box-shadow: 0 8px 18px rgba(220, 38, 38, 0.2);
+      color: #b91c1c;
     }
     .preferences-actions button.preferences-cancel,
     .preferences-actions button.preferences-reset {
@@ -1252,6 +1604,16 @@ def build_html(payload: Dict[str, object]) -> str:
       border-color: rgba(37, 99, 235, 0.55);
       outline: none;
       transform: translateY(-1px);
+    }
+    .paper .link-button.readlist-toggle.is-active {
+      background: var(--brand);
+      color: white;
+      border-color: var(--brand);
+    }
+    .paper .link-button.readlist-toggle.is-active:hover,
+    .paper .link-button.readlist-toggle.is-active:focus {
+      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.24);
+      color: white;
     }
     body.display-mode-title .paper:not(.paper--expanded) .quick-view-button,
     body.display-mode-authors .paper:not(.paper--expanded) .quick-view-button {
@@ -1664,6 +2026,10 @@ def build_html(payload: Dict[str, object]) -> str:
         <span id="meta-generated">Generated at: __GENERATED_AT__</span>
         <span id="meta-total">Total papers: __TOTAL_PAPERS__</span>
       </div>
+      <form class="date-switcher" id="date-switcher-form">
+        <input type="date" id="date-switcher-input" aria-label="Jump to date" />
+        <button type="submit">Open</button>
+      </form>
       <div class="source-switcher" id="source-switcher" role="group" aria-label="Select arXiv category"></div>
       <div class="display-mode" id="display-mode-controls" role="group" aria-label="Select paper layout"></div>
     </div>
@@ -1673,37 +2039,59 @@ def build_html(payload: Dict[str, object]) -> str:
   </noscript>
   <div class="layout">
     <aside class="sidebar">
-      <div class="preferences-card">
-        <h2>Tracking</h2>
-        <div id="preferences-view" class="preferences-view">
-          <div class="preferences-group">
-            <span class="preferences-label">Favorite authors</span>
-            <div class="chip-set" id="favorite-authors-view"></div>
-          </div>
-          <div class="preferences-group">
-            <span class="preferences-label">Watched keywords</span>
-            <div class="chip-set" id="keywords-view"></div>
-          </div>
-          <button type="button" id="edit-preferences" class="preferences-edit">Edit</button>
-          <p class="preferences-status" id="preferences-status-view" role="status" aria-live="polite"></p>
-        </div>
-        <form id="preferences-form" hidden>
-          <label for="favorite-authors-input" class="preferences-label">Favorite authors</label>
-          <textarea id="favorite-authors-input" placeholder="One per line or comma separated">__FAVORITES_DEFAULT__</textarea>
-          <label for="keywords-input" class="preferences-label">Watched keywords</label>
-          <textarea id="keywords-input" placeholder="One per line or comma separated">__KEYWORDS_DEFAULT__</textarea>
-          <div class="preferences-actions">
-            <button type="submit">Save</button>
-            <button type="button" id="cancel-preferences" class="preferences-cancel">Cancel</button>
-            <button type="button" id="reset-preferences" class="preferences-reset">Reset</button>
-          </div>
-          <p class="preferences-status" id="preferences-status" role="status" aria-live="polite"></p>
-        </form>
-      </div>
       <div class="nav-title">On this page</div>
       <nav aria-label="Section navigation"></nav>
     </aside>
     <main id="main-content" class="content">
+      <section id="workspace" class="content-section" data-static-section="true">
+        <div class="section-header">
+          <h2>Workspace</h2>
+          <p class="section-summary">Track favorite authors/keywords and manage your read list.</p>
+        </div>
+        <div class="workspace-grid">
+          <div class="preferences-card">
+            <h2>Tracking</h2>
+            <div id="preferences-view" class="preferences-view">
+              <div class="preferences-group">
+                <span class="preferences-label">Favorite authors</span>
+                <div class="chip-set" id="favorite-authors-view"></div>
+              </div>
+              <div class="preferences-group">
+                <span class="preferences-label">Watched keywords</span>
+                <div class="chip-set" id="keywords-view"></div>
+              </div>
+              <button type="button" id="edit-preferences" class="preferences-edit">Edit</button>
+              <p class="preferences-status" id="preferences-status-view" role="status" aria-live="polite"></p>
+            </div>
+            <form id="preferences-form" hidden>
+              <label for="favorite-authors-input" class="preferences-label">Favorite authors</label>
+              <textarea id="favorite-authors-input" placeholder="One per line or comma separated">__FAVORITES_DEFAULT__</textarea>
+              <label for="keywords-input" class="preferences-label">Watched keywords</label>
+              <textarea id="keywords-input" placeholder="One per line or comma separated">__KEYWORDS_DEFAULT__</textarea>
+              <div class="preferences-actions">
+                <button type="submit">Save</button>
+                <button type="button" id="cancel-preferences" class="preferences-cancel">Cancel</button>
+                <button type="button" id="reset-preferences" class="preferences-reset">Reset</button>
+              </div>
+              <p class="preferences-status" id="preferences-status" role="status" aria-live="polite"></p>
+            </form>
+          </div>
+          <div class="readlist-card">
+            <div class="readlist-header">
+              <div>
+                <h2>Read list</h2>
+                <p class="readlist-subtitle">Save papers to revisit.</p>
+              </div>
+              <button type="button" id="read-list-clear" class="readlist-clear" aria-label="Clear saved papers">Clear</button>
+            </div>
+            <div class="readlist-count-row">
+              <span class="readlist-count" id="read-list-count">0</span>
+              <span>saved</span>
+            </div>
+            <div id="read-list-body" class="readlist-body"></div>
+          </div>
+        </div>
+      </section>
       <section id="overview" class="content-section is-collapsed is-hidden">
         <div class="section-header">
           <h2>All Papers</h2>
@@ -1731,13 +2119,6 @@ def build_html(payload: Dict[str, object]) -> str:
           <button type="button" class="section-toggle" data-target="keyword" aria-expanded="false">Show section</button>
         </div>
         <div class="section-body" id="keywords-body"></div>
-      </section>
-      <section id="categories" class="content-section is-collapsed is-hidden" data-collapsible="true">
-        <div class="section-header">
-          <h2>Browse by Category</h2>
-          <button type="button" class="section-toggle" data-target="categories" aria-expanded="false">Show section</button>
-        </div>
-        <div class="section-body" id="categories-body"></div>
       </section>
     </main>
   </div>
@@ -1823,12 +2204,46 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Target date in YYYY-MM-DD format; defaults to today.",
     )
+    parser.add_argument(
+        "--style-only",
+        action="store_true",
+        help="Update styling/template only using the latest existing digest without fetching new content.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     config = load_config(args.config)
+
+    if args.style_only:
+        candidates = []
+        if args.output.exists():
+            candidates.append(args.output)
+        latest = find_latest_digest(args.output.parent)
+        if latest and latest not in candidates:
+            candidates.append(latest)
+
+        payload = None
+        source_html: Path | None = None
+        for path in candidates:
+            try:
+                payload = load_payload_from_file(path)
+                source_html = path
+                break
+            except Exception:
+                continue
+
+        if payload is None or source_html is None:
+            raise SystemExit(
+                "Style-only mode requires an existing digest HTML (e.g., index-YYYY-MM-DD.html) to reuse its content.",
+            )
+
+        html = build_html(payload)
+        write_output(html, source_html)
+        redirect_html = build_redirect_html(source_html.name)
+        write_output(redirect_html, args.output)
+        return
 
     if args.date:
         try:
@@ -1878,62 +2293,7 @@ def main() -> None:
     html = build_html(payload)
     write_output(html, dated_filename)
 
-    redirect_html = dedent(
-        f"""
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="utf-8" />
-          <title>Loading Digest...</title>
-          <script>
-            (function() {{
-              const target = "{dated_filename.name}";
-
-              function injectLatest(html) {{
-                history.replaceState(null, "", "index.html");
-                document.open();
-                document.write(html);
-                document.close();
-              }}
-
-              function showFallback() {{
-                const status = document.getElementById("digest-status");
-                if (!status) {{
-                  return;
-                }}
-                const link = document.createElement("a");
-                link.href = target;
-                link.textContent = target;
-                status.textContent = "Latest digest: ";
-                status.appendChild(link);
-              }}
-
-              if (!window.fetch) {{
-                window.location.href = target;
-                return;
-              }}
-
-              fetch(target, {{ credentials: "same-origin", cache: "no-store" }})
-                .then(function(response) {{
-                  if (!response.ok) {{
-                    throw new Error("Failed to load latest digest");
-                  }}
-                  return response.text();
-                }})
-                .then(injectLatest)
-                .catch(function(error) {{
-                  console.error(error);
-                  showFallback();
-                }});
-            }})();
-          </script>
-        </head>
-        <body>
-          <p id="digest-status">Loading latest digest...</p>
-        </body>
-        </html>
-        """
-    ).strip()
+    redirect_html = build_redirect_html(dated_filename.name)
     write_output(redirect_html, args.output)
 
 
