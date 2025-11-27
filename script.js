@@ -58,7 +58,6 @@
     resetPreferences: document.getElementById('reset-preferences'),
     preferencesStatusView: document.getElementById('preferences-status-view'),
     preferencesStatus: document.getElementById('preferences-status'),
-    dateSwitcher: document.getElementById('switch-date'),
     readListBody: document.getElementById('read-list-body'),
     readListCount: document.getElementById('read-list-count'),
     readListClear: document.getElementById('read-list-clear'),
@@ -120,8 +119,8 @@
     }
     elements.dateSwitcherForm.addEventListener('submit', (event) => {
       event.preventDefault();
-      const value = elements.dateSwitcherInput.value;
-      if (!value || !/^(\\d{4}-\\d{2}-\\d{2})$/.test(value)) {
+      const value = resolveDateInputValue(elements.dateSwitcherInput);
+      if (!value) {
         window.alert('Please choose a date as YYYY-MM-DD.');
         return;
       }
@@ -474,6 +473,35 @@
     if (sourceData && sourceData.date) {
       elements.dateSwitcherInput.value = sourceData.date;
     }
+  }
+
+  function resolveDateInputValue(input) {
+    if (!input) return '';
+    // Try valueAsDate first (most reliable for date inputs)
+    if (input.valueAsDate instanceof Date && !Number.isNaN(input.valueAsDate.getTime())) {
+      const year = input.valueAsDate.getFullYear();
+      const month = String(input.valueAsDate.getMonth() + 1).padStart(2, '0');
+      const day = String(input.valueAsDate.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    // Fallback to parsing the value string
+    const raw = input.value ? input.value.trim() : '';
+    if (raw) {
+      // Try to match YYYY-MM-DD format
+      const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (match) {
+        return raw;
+      }
+      // Try to parse as Date and format
+      const parsed = new Date(raw);
+      if (parsed instanceof Date && !Number.isNaN(parsed.getTime())) {
+        const year = parsed.getFullYear();
+        const month = String(parsed.getMonth() + 1).padStart(2, '0');
+        const day = String(parsed.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+    }
+    return '';
   }
 
   function updateFooter(sourceData) {
