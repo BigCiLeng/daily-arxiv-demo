@@ -6,6 +6,11 @@
   const PREF_STORAGE_KEY = 'arxivDigestPreferences';
   const DISPLAY_MODE_STORAGE_KEY = 'arxivDigestDisplayMode';
   const READ_LIST_STORAGE_KEY = 'arxivDigestReadList';
+  const FILTER_STORAGE_KEY = 'arxivDigestQuickFilter';
+  const READ_STATE_STORAGE_KEY = 'arxivDigestReadState';
+  const SORT_STORAGE_KEY = 'arxivDigestSortMode';
+  const UNREAD_STORAGE_KEY = 'arxivDigestUnreadOnly';
+  const HIGHLIGHT_STORAGE_KEY = 'arxivDigestHighlightEnabled';
   const DISPLAY_MODE_CLASSES = {
     title: 'display-mode-title',
     authors: 'display-mode-authors',
@@ -35,6 +40,11 @@
     lastModalTrigger: null,
     readList: loadStoredReadList(),
     readListEditingId: '',
+    filterQuery: loadStoredQuickFilter(),
+    readIds: new Set(loadStoredReadState()),
+    sortMode: loadStoredSortMode() || 'newest',
+    unreadOnly: loadStoredUnreadOnly(),
+    highlightEnabled: loadStoredHighlightEnabled(),
   };
 
   if (!RAW_DATA.sources[state.source]) {
@@ -47,6 +57,10 @@
     sourceSwitcher: document.getElementById('source-switcher'),
     displayModeControls: document.getElementById('display-mode-controls'),
     nav: document.querySelector('.sidebar nav'),
+    searchInput: document.getElementById('search-input'),
+    sortSelect: document.getElementById('sort-select'),
+    unreadToggle: document.getElementById('unread-toggle'),
+    highlightToggle: document.getElementById('highlight-toggle'),
     preferencesView: document.getElementById('preferences-view'),
     preferencesForm: document.getElementById('preferences-form'),
     favoriteAuthorsView: document.getElementById('favorite-authors-view'),
@@ -90,6 +104,7 @@
   document.addEventListener('click', handleQuickViewClick);
   document.addEventListener('click', handlePaperClick);
   document.addEventListener('click', handleReadListClick);
+  document.addEventListener('click', handlePaperLinkClick);
   document.addEventListener('keydown', handlePaperKeydown);
   document.addEventListener('keydown', handleGlobalKeydown);
 
@@ -124,8 +139,42 @@
         window.alert('Please choose a date as YYYY-MM-DD.');
         return;
       }
-      const target = `index-${value}.html`;
+      const target = `archive/index-${value}.html`;
       window.location.href = target;
+    });
+  }
+
+  if (elements.searchInput) {
+    elements.searchInput.value = state.filterQuery;
+    elements.searchInput.addEventListener('input', (event) => {
+      handleSearchInput(event.target.value);
+    });
+  }
+
+  if (elements.sortSelect) {
+    elements.sortSelect.value = state.sortMode;
+    elements.sortSelect.addEventListener('change', (event) => {
+      state.sortMode = event.target.value || 'newest';
+      saveSortMode(state.sortMode);
+      renderAll({ resetActiveSection: false });
+    });
+  }
+
+  if (elements.unreadToggle) {
+    elements.unreadToggle.addEventListener('click', () => {
+      state.unreadOnly = !state.unreadOnly;
+      saveUnreadOnly(state.unreadOnly);
+      updateToggleStates();
+      renderAll({ resetActiveSection: false });
+    });
+  }
+
+  if (elements.highlightToggle) {
+    elements.highlightToggle.addEventListener('click', () => {
+      state.highlightEnabled = !state.highlightEnabled;
+      saveHighlightEnabled(state.highlightEnabled);
+      updateToggleStates();
+      renderAll({ resetActiveSection: false });
     });
   }
 
@@ -172,6 +221,7 @@
     }
     renderSourceButtons();
     renderDisplayModeControls();
+    updateToggleStates();
     renderPreferencesPanel();
     renderReadList();
 
@@ -196,6 +246,18 @@
     setActiveSection(state.activeSection);
     updatePaperAria();
     updateReadListButtons();
+    applyReadState();
+  }
+
+  function updateToggleStates() {
+    if (elements.unreadToggle) {
+      elements.unreadToggle.classList.toggle('is-active', state.unreadOnly);
+      elements.unreadToggle.setAttribute('aria-pressed', String(state.unreadOnly));
+    }
+    if (elements.highlightToggle) {
+      elements.highlightToggle.classList.toggle('is-active', state.highlightEnabled);
+      elements.highlightToggle.setAttribute('aria-pressed', String(state.highlightEnabled));
+    }
   }
 
   function renderSourceButtons() {
@@ -312,17 +374,86 @@
     container.innerHTML = sorted.map((item, index) => renderReadListItem(item, index)).join('');
   }
 
+  function handleSearchInput(value) {
+    state.filterQuery = String(value || '');
+    saveQuickFilter(state.filterQuery);
+    renderAll({ resetActiveSection: false });
+  }
+
+  function applyActiveFilters(articles) {
+    let next = articles;
+    const query = normalizeSearchValue(state.filterQuery);
+    if (query) {
+      next = next.filter((article) => articleMatchesQuery(article, query));
+    }
+    if (state.unreadOnly) {
+      next = next.filter((article) => !state.readIds.has(resolveArticleId(article)));
+    }
+    return next;
+  }
+
+  function sortArticles(articles) {
+    if (state.sortMode !== 'relevance') {
+      return articles;
+    }
+    const query = normalizeSearchValue(state.filterQuery);
+    const terms = query.split(/\s+/).filter(Boolean);
+    if (!terms.length) {
+      return articles;
+    }
+    return [...articles].sort((a, b) => scoreArticle(b, terms) - scoreArticle(a, terms));
+  }
+
+  function scoreArticle(article, terms) {
+    const haystack = buildSearchText(article);
+    return terms.reduce((score, term) => score + (haystack.includes(term) ? 1 : 0), 0);
+  }
+
+  function articleMatchesQuery(article, query) {
+    if (!query) return true;
+    return buildSearchText(article).includes(query);
+  }
+
+  function buildSearchText(article) {
+    const keywords = Array.isArray(article.keywords) ? article.keywords : [];
+    return normalizeSearchValue([
+      article.title,
+      (article.authors || []).join(' '),
+      (article.subjects || []).join(' '),
+      article.abstract,
+      article.summary,
+      keywords.join(' '),
+    ].filter(Boolean).join(' '));
+  }
+
+  function resolveArticleId(article) {
+    return String(article && (article.arxiv_id || article.id) ? article.arxiv_id || article.id : '').trim();
+  }
+
+  function shouldHighlightArticle(article) {
+    if (!state.highlightEnabled) return false;
+    const text = buildSearchText(article);
+    const query = normalizeSearchValue(state.filterQuery);
+    if (query && text.includes(query)) {
+      return true;
+    }
+    const keywords = state.preferences.keywords || [];
+    return keywords.some((keyword) => text.includes(normalizeSearchValue(keyword)));
+  }
+
   function renderOverview(sourceData, articles) {
     const body = elements.overviewBody;
     if (!body) return 0;
     const summary = elements.overviewSummary;
-    const total = articles.length;
+    const filtered = sortArticles(applyActiveFilters(articles));
+    const total = filtered.length;
     const sourceLabel = sourceData.label || state.source;
     const plural = total === 1 ? '' : 's';
     if (summary) {
-      summary.textContent = total + ' paper' + plural + ' from ' + sourceLabel + '.';
+      const filterLabel = state.filterQuery || state.unreadOnly ? ' (filtered)' : '';
+      summary.textContent = total + ' paper' + plural + filterLabel + ' from ' + sourceLabel + '.';
     }
-    body.innerHTML = articles.map(renderArticleCard).join('') || '<p class="empty-state">No papers available.</p>';
+    body.innerHTML = filtered.map(renderArticleCard).join('') || '<p class="empty-state">No papers available.</p>';
     return total;
   }
 
@@ -374,8 +505,9 @@
     if (!body) return 0;
     const favorites = state.preferences.favorite_authors || [];
     const matches = filterByFavoriteAuthors(articles, favorites);
-    body.innerHTML = buildWatcherSectionContent(favorites, matches, 'Add authors in the sidebar to highlight researchers you care about.');
-    return matches.length;
+    const filtered = sortArticles(applyActiveFilters(matches));
+    body.innerHTML = buildWatcherSectionContent(favorites, filtered, 'Add authors in the sidebar to highlight researchers you care about.');
+    return filtered.length;
   }
 
   function renderKeywords(sourceData, articles) {
@@ -383,8 +515,9 @@
     if (!body) return 0;
     const keywords = state.preferences.keywords || [];
     const matches = filterByKeywords(articles, keywords);
-    body.innerHTML = buildWatcherSectionContent(keywords, matches, 'Track important topics by adding keywords in the sidebar.');
-    return matches.length;
+    const filtered = sortArticles(applyActiveFilters(matches));
+    body.innerHTML = buildWatcherSectionContent(keywords, filtered, 'Track important topics by adding keywords in the sidebar.');
+    return filtered.length;
   }
 
   function buildWatcherSectionContent(items, matches, emptyMessage) {
@@ -401,7 +534,8 @@
   function renderCategories(sourceData, articles) {
     const body = elements.categoriesBody;
     if (!body) return [];
-    const groups = buildSectionGrouping(articles);
+    const filtered = sortArticles(applyActiveFilters(articles));
+    const groups = buildSectionGrouping(filtered);
     if (!groups.length) {
       body.innerHTML = '<p class="empty-state">No categories available for this source.</p>';
       return [];
@@ -598,6 +732,7 @@
     if (!details.url && !details.title) return;
     event.preventDefault();
     event.stopPropagation();
+    markAsRead(articleId);
     openAbstractModal(details, button);
   }
 
@@ -607,7 +742,16 @@
     if (event.target.closest('a')) return;
     if (event.target.closest('.js-view-abstract')) return;
     if (event.target.closest('.js-readlist-toggle')) return;
+    markAsRead(paper.getAttribute('data-paper-id'));
     togglePaperExpansion(paper);
+  }
+
+  function handlePaperLinkClick(event) {
+    const link = event.target.closest('.paper a');
+    if (!link) return;
+    const paper = link.closest('.paper');
+    if (!paper) return;
+    markAsRead(paper.getAttribute('data-paper-id'));
   }
 
   function handlePaperKeydown(event) {
@@ -618,6 +762,7 @@
       event.preventDefault();
     }
     if (event.target.closest('.js-readlist-toggle')) return;
+    markAsRead(paper.getAttribute('data-paper-id'));
     togglePaperExpansion(paper);
   }
 
@@ -833,15 +978,17 @@
     const keywordBadges = keywords.length
       ? `<span class="keyword-tags">${keywords.map((keyword) => `<span class="keyword-tag">${escapeHtml(keyword)}</span>`).join('')}</span>`
       : '';
+    const searchText = buildSearchText(article);
     const linkItems = [`<a href="${absUrl}" target="_blank" rel="noopener">Abstract</a>`, pdfLink].filter(Boolean).join(' ');
     const isUserExpanded = state.expandedArticles.has(articleId);
     const ariaExpanded = state.displayMode === 'full' || isUserExpanded;
     const expandedClass = isUserExpanded ? ' paper--expanded' : '';
+    const highlightClass = shouldHighlightArticle(article) ? ' paper--highlight' : '';
     const summaryBlock = summary
       ? `<p class="summary">${summary}</p>`
       : '';
     return `
-      <article class="paper${expandedClass}" data-paper-id="${escapeHtml(articleId)}" tabindex="0" aria-expanded="${ariaExpanded}">
+      <article class="paper${expandedClass}${highlightClass}" data-paper-id="${escapeHtml(articleId)}" data-search="${escapeHtml(searchText)}" tabindex="0" aria-expanded="${ariaExpanded}">
         <h3><a href="${absUrl}" target="_blank" rel="noopener">${title}</a>${keywordBadges}${quickViewButton}${readListButton}</h3>
         <p class="meta">
           <span class="id">${escapeHtml(article.arxiv_id)}</span>
@@ -957,6 +1104,28 @@
     });
   }
 
+  function applyReadState() {
+    const cards = Array.from(document.querySelectorAll('.paper'));
+    cards.forEach((card) => {
+      const paperId = card.getAttribute('data-paper-id') || '';
+      card.classList.toggle('is-read', Boolean(paperId && state.readIds.has(paperId)));
+    });
+  }
+
+  function markAsRead(articleId) {
+    const normalized = String(articleId || '').trim();
+    if (!normalized || state.readIds.has(normalized)) {
+      return;
+    }
+    state.readIds.add(normalized);
+    saveReadState(Array.from(state.readIds));
+    if (state.unreadOnly) {
+      renderAll({ resetActiveSection: false });
+    } else {
+      applyReadState();
+    }
+  }
+
   function isInReadList(articleId) {
     return state.readList.some((item) => item.id === articleId);
   }
@@ -1045,6 +1214,10 @@
     return Object.prototype.hasOwnProperty.call(DISPLAY_MODE_CLASSES, normalized) ? normalized : 'full';
   }
 
+  function normalizeSearchValue(value) {
+    return String(value || '').toLowerCase();
+  }
+
   function normalizePreferences(raw) {
     const normalizeList = (value) => {
       if (Array.isArray(value)) {
@@ -1097,6 +1270,79 @@
   function saveDisplayMode(mode) {
     try {
       localStorage.setItem(DISPLAY_MODE_STORAGE_KEY, normalizeDisplayMode(mode));
+    } catch (_) {}
+  }
+
+  function loadStoredQuickFilter() {
+    try {
+      return localStorage.getItem(FILTER_STORAGE_KEY) || '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function saveQuickFilter(value) {
+    try {
+      localStorage.setItem(FILTER_STORAGE_KEY, String(value || ''));
+    } catch (_) {}
+  }
+
+  function loadStoredReadState() {
+    try {
+      const raw = localStorage.getItem(READ_STATE_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function saveReadState(list) {
+    try {
+      localStorage.setItem(READ_STATE_STORAGE_KEY, JSON.stringify(list));
+    } catch (_) {}
+  }
+
+  function loadStoredSortMode() {
+    try {
+      return localStorage.getItem(SORT_STORAGE_KEY) || 'newest';
+    } catch (_) {
+      return 'newest';
+    }
+  }
+
+  function saveSortMode(value) {
+    try {
+      localStorage.setItem(SORT_STORAGE_KEY, String(value || 'newest'));
+    } catch (_) {}
+  }
+
+  function loadStoredUnreadOnly() {
+    try {
+      return localStorage.getItem(UNREAD_STORAGE_KEY) === 'true';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function saveUnreadOnly(value) {
+    try {
+      localStorage.setItem(UNREAD_STORAGE_KEY, String(Boolean(value)));
+    } catch (_) {}
+  }
+
+  function loadStoredHighlightEnabled() {
+    try {
+      const stored = localStorage.getItem(HIGHLIGHT_STORAGE_KEY);
+      return stored === null ? true : stored === 'true';
+    } catch (_) {
+      return true;
+    }
+  }
+
+  function saveHighlightEnabled(value) {
+    try {
+      localStorage.setItem(HIGHLIGHT_STORAGE_KEY, String(Boolean(value)));
     } catch (_) {}
   }
 
@@ -1171,6 +1417,7 @@
     };
     return details;
   }
+
 })();
 
   
