@@ -8,57 +8,57 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      /* Palette: Deep Space Sci-Fi */
-      --bg-app: #030508;
-      --bg-surface: #0b0e14;
-      --bg-panel: rgba(11, 14, 20, 0.6);
-      --text-primary: #e0e6ed;
-      --text-secondary: #94a3b8;
-      --brand: #00f3ff; /* Neon Cyan */
-      --brand-dim: rgba(0, 243, 255, 0.08);
-      --brand-glow: rgba(0, 243, 255, 0.3);
-      --accent: #bc13fe; /* Neon Purple */
-      --border: rgba(148, 163, 184, 0.12);
-      --border-active: rgba(0, 243, 255, 0.4);
-      --danger: #ff0055;
-      --success: #00ff9d;
-      --font-mono: "JetBrains Mono", "Fira Code", monospace;
+      --bg-app: #f6f7f9;
+      --bg-surface: #ffffff;
+      --bg-panel: #f1f3f5;
+      --text-primary: #1f2933;
+      --text-secondary: #52606d;
+      --brand: #1d4ed8;
+      --brand-dim: rgba(29, 78, 216, 0.08);
+      --brand-glow: rgba(29, 78, 216, 0.18);
+      --accent: #64748b;
+      --border: #e5e7eb;
+      --border-active: rgba(29, 78, 216, 0.35);
+      --danger: #b91c1c;
+      --success: #0f766e;
+      --font-mono: "IBM Plex Mono", "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
       --font-sans: "Inter", system-ui, sans-serif;
+      --font-serif: "Georgia", "Times New Roman", serif;
+      --sidebar-width: 200px;
     }
+
     *, *::before, *::after { box-sizing: border-box; }
     body {
       font-family: var(--font-sans);
       margin: 0;
       background: var(--bg-app);
       color: var(--text-primary);
-      line-height: 1.6;
-      scroll-behavior: smooth;
-      background-image:
-        radial-gradient(circle at 50% 0%, #1a2035 0%, transparent 60%),
-        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-      background-size: 100% 100%, 40px 40px, 40px 40px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
-    a { color: var(--brand); text-decoration: none; transition: all 0.2s ease; }
-    a:hover { color: #fff; text-shadow: 0 0 8px var(--brand); }
-    
-    /* Header & Controls */
+    body.modal-open {
+      overflow: hidden;
+    }
+    a { color: var(--brand); text-decoration: none; font-weight: 500; }
+    a:hover { text-decoration: underline; }
+
+    /* Header */
     header {
-      background: rgba(3, 5, 8, 0.85);
-      backdrop-filter: blur(12px);
+      background: var(--bg-surface);
       border-bottom: 1px solid var(--border);
       position: sticky;
       top: 0;
-      z-index: 100;
-      padding: 16px 0;
+      z-index: 50;
+      padding: 12px 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     }
     .inner {
-      max-width: 1400px;
+      max-width: 1200px;
       margin: 0 auto;
-      padding: 0 24px;
+      padding: 0 20px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 12px;
     }
     .header-top {
       display: flex;
@@ -68,318 +68,459 @@
       gap: 16px;
     }
     .page-title {
-      font-family: var(--font-mono);
-      font-size: 1.5rem;
+      font-family: var(--font-serif);
+      font-size: 1.25rem;
       font-weight: 700;
-      letter-spacing: -0.04em;
+      color: var(--text-primary);
       margin: 0;
-      text-transform: uppercase;
       display: flex;
       align-items: center;
-      gap: 12px;
-      color: #fff;
+      gap: 10px;
     }
     .page-title .version {
-      font-size: 0.75rem;
-      background: var(--border);
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      background: var(--bg-panel);
       padding: 2px 6px;
       border-radius: 4px;
-      color: var(--text-secondary);
+      font-weight: normal;
     }
-    .header-actions {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
-    
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+
     /* Controls Deck */
     .control-deck {
       display: flex;
       flex-wrap: wrap;
-      gap: 16px;
+      gap: 12px;
       align-items: center;
-      padding: 12px;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
+      padding: 4px 0;
     }
     .search-group {
-      flex: 1 1 280px;
+      flex: 1 1 200px;
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 0 12px;
-      background: rgba(0,0,0,0.2);
-      border-radius: 4px;
+      padding: 6px 10px;
+      background: var(--bg-surface);
       border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: border-color 0.2s;
     }
+    .search-group:focus-within { border-color: var(--brand); }
     .search-group input {
-      background: transparent;
       border: none;
-      color: #fff;
-      font-family: var(--font-mono);
-      font-size: 0.9rem;
+      background: transparent;
       width: 100%;
-      padding: 8px 0;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      font-family: var(--font-sans);
     }
     .search-group input:focus { outline: none; }
     
-    .filters-group {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    select, button.toggle-btn {
+    .filters-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    select, button.toggle-btn, .source-button, .display-mode__button {
       appearance: none;
-      background: transparent;
+      background: var(--bg-surface);
       border: 1px solid var(--border);
       color: var(--text-secondary);
-      font-family: var(--font-mono);
       font-size: 0.8rem;
       padding: 6px 12px;
-      border-radius: 4px;
+      border-radius: 6px;
       cursor: pointer;
-      text-transform: uppercase;
-      transition: all 0.2s ease;
+      font-weight: 500;
+      font-family: var(--font-sans);
+      transition: all 0.15s;
     }
-    select:hover, button.toggle-btn:hover {
+    select:hover, button:hover { border-color: var(--text-secondary); color: var(--text-primary); }
+    button.is-active {
+      background: var(--brand);
+      color: #fff;
       border-color: var(--brand);
-      color: var(--brand);
     }
-    button.toggle-btn.is-active {
-      background: var(--brand-dim);
-      border-color: var(--brand);
-      color: var(--brand);
-      box-shadow: 0 0 12px var(--brand-dim);
-    }
-    
+    button.is-active:hover { opacity: 0.9; }
+
     .page-meta {
       font-family: var(--font-mono);
       font-size: 0.75rem;
       color: var(--text-secondary);
       display: flex;
       gap: 16px;
-      opacity: 0.7;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
     }
-    
+
     /* Layout */
     .layout {
       display: flex;
-      gap: 32px;
-      max-width: 1400px;
-      margin: 32px auto;
-      padding: 0 24px;
+      gap: 24px;
+      max-width: 1200px;
+      margin: 24px auto;
+      padding: 0 20px;
     }
     .sidebar {
-      width: 260px;
+      width: var(--sidebar-width);
       flex-shrink: 0;
       position: sticky;
-      top: 140px;
+      top: 120px;
       height: fit-content;
-      max-height: calc(100vh - 160px);
+      max-height: calc(100vh - 140px);
       overflow-y: auto;
-      padding-right: 12px;
+      padding-right: 8px;
     }
-    .nav-title {
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-      margin-bottom: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+    body.sidebar-collapsed .sidebar {
+      display: none;
     }
-    .nav-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-    .nav-item a {
-      display: block;
-      padding: 6px 10px;
+    body.sidebar-collapsed .layout {
+      gap: 0;
+    }
+    body.sidebar-collapsed .content {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    #sidebar-toggle {
+      background: transparent;
+      border: 1px solid var(--border);
       color: var(--text-secondary);
       border-radius: 4px;
-      font-size: 0.9rem;
+      padding: 4px 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
     }
-    .nav-item a:hover, .nav-item a.is-active {
-      background: var(--brand-dim);
+    #sidebar-toggle:hover {
+      border-color: var(--text-primary);
+      color: var(--text-primary);
+    }
+    body.sidebar-collapsed #sidebar-toggle {
+      background: var(--bg-panel);
       color: var(--brand);
     }
-    .nav-list.nav-level-2 { padding-left: 12px; border-left: 1px solid var(--border); margin-left: 8px; }
-    
+    .nav-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .nav-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
+    .nav-item a {
+      display: block;
+      padding: 4px 8px;
+      color: var(--text-secondary);
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+    .nav-item a:hover { color: var(--text-primary); }
+    .nav-item a.is-active { color: var(--brand); font-weight: 600; }
+    .nav-list.nav-level-2 { padding-left: 12px; margin-top: 2px; border-left: 1px solid var(--border); margin-left: 4px; }
+
     /* Content */
     .content { flex: 1; min-width: 0; }
-    .content-section { margin-bottom: 48px; }
+    .content-section { margin-bottom: 60px; }
     .section-header {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      margin-bottom: 24px;
-      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--text-primary);
       padding-bottom: 8px;
     }
     .section-header h2 {
       margin: 0;
-      font-size: 1.2rem;
-      color: #fff;
-      text-transform: uppercase;
+      font-family: var(--font-serif);
+      font-size: 1.4rem;
+      color: var(--text-primary);
     }
+    .section-summary { color: var(--text-secondary); font-size: 0.9rem; margin: 4px 0 0; }
     .section-toggle {
-      background: transparent;
-      border: none;
-      color: var(--brand);
-      font-family: var(--font-mono);
-      cursor: pointer;
-      font-size: 0.8rem;
+      background: none; border: none; color: var(--brand); cursor: pointer; font-size: 0.8rem; font-family: var(--font-sans);
     }
-    
-    /* Cards */
+
+    /* Cards/Papers */
     .paper {
       background: var(--bg-surface);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 20px;
+      border-radius: 8px;
+      padding: 24px;
       margin-bottom: 16px;
-      position: relative;
-      overflow: hidden;
-      transition: all 0.2s ease;
+      transition: box-shadow 0.2s, transform 0.2s;
     }
     .paper:hover {
-      border-color: var(--brand);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      border-color: #d1d5db;
     }
-    .paper::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; width: 2px; height: 100%;
-      background: var(--brand);
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    .paper:hover::before { opacity: 1; }
-    .paper.is-read {
-      opacity: 0.55;
-      border-color: rgba(148, 163, 184, 0.2);
-    }
-    .paper.paper--highlight {
-      border-color: var(--border-active);
-      box-shadow: 0 0 16px rgba(0, 243, 255, 0.2);
-    }
+    .paper.is-read { opacity: 0.6; background: #fafafa; }
+    .paper.paper--highlight { border-left: 4px solid var(--brand); }
+    .paper.paper--expanded { border-color: var(--brand); }
     
-    .paper h3 {
-      margin: 0 0 8px 0;
-      font-size: 1.1rem;
-      line-height: 1.4;
+    .paper-header-row {
       display: flex;
       justify-content: space-between;
-      gap: 12px;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 12px;
     }
-    .paper h3 a { color: #fff; }
+    .paper-title-col { flex: 1; min-width: 0; }
+    .paper-actions-col {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .paper-actions-col .link-button { white-space: nowrap; }
+    .paper-tags-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .paper h3 {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: 1.1rem;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+    .paper h3 a { color: var(--text-primary); }
+    .paper h3 a:hover { color: var(--brand); }
     .paper .meta {
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
+      font-size: 0.85rem;
       color: var(--text-secondary);
       margin-bottom: 12px;
     }
+    .paper .meta .authors { color: var(--text-primary); font-weight: 500; }
     .paper .summary {
+      font-family: var(--font-serif);
       font-size: 0.95rem;
-      color: var(--text-primary);
-      margin-bottom: 12px;
-      opacity: 0.9;
+      color: #374151;
+      margin-bottom: 16px;
+      line-height: 1.6;
     }
     .paper .subjects {
-      font-size: 0.8rem;
-      color: var(--text-secondary);
       font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
     }
-    
+    .paper .links a {
+      font-size: 0.8rem;
+      margin-right: 16px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
     .keyword-tag {
-      background: rgba(188, 19, 254, 0.15);
-      color: #e0aaff;
+      background: var(--bg-panel);
+      color: var(--text-secondary);
       font-size: 0.7rem;
       padding: 2px 6px;
-      border-radius: 2px;
-      border: 1px solid rgba(188, 19, 254, 0.3);
-      text-transform: uppercase;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      margin-left: 0;
+      font-weight: normal;
+      vertical-align: middle;
       font-family: var(--font-mono);
-      margin-left: 6px;
     }
-    
-    /* Stats Grid */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-    }
-    .stat-card {
+
+    /* Read List (Minimal/Academic) */
+    .readlist-card {
       background: var(--bg-surface);
       border: 1px solid var(--border);
-      padding: 16px;
       border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 24px;
     }
-    .stat-card h3 {
-      font-size: 0.75rem;
-      color: var(--text-secondary);
-      margin: 0 0 8px 0;
-      text-transform: uppercase;
-    }
-    .stat-card p {
-      font-size: 1.5rem;
-      font-family: var(--font-mono);
-      color: var(--brand);
-      margin: 0;
-    }
-    
-    /* Interactive Elements */
-    .link-button {
+    .readlist-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
+    }
+    .readlist-header h2 { margin: 0; font-size: 0.95rem; font-weight: 600; }
+    .readlist-subtitle { margin: 0; font-size: 0.8rem; color: var(--text-secondary); display: none; }
+    .readlist-count-row {
+      padding: 6px 16px;
       font-size: 0.75rem;
-      padding: 4px 8px;
-      cursor: pointer;
-      border-radius: 2px;
-      font-family: var(--font-mono);
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
     }
-    .link-button:hover {
-      border-color: var(--brand);
-      color: var(--brand);
+    .readlist-body {
+      max-height: 280px;
+      overflow-y: auto;
+      padding: 0 16px 12px;
     }
-    
-    /* Modal */
-    .abstract-modal__dialog {
-      background: #0f1218;
-      border: 1px solid var(--brand);
-      box-shadow: 0 0 40px rgba(0, 243, 255, 0.1);
+    .readlist-item {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    .readlist-item:last-child { border-bottom: none; }
+    .readlist-item__container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+    }
+    .readlist-link-group {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+    .readlist-link-group a {
       color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    
+    .readlist-link-group a:hover { color: var(--brand); }
+    .readlist-index { font-family: var(--font-mono); color: var(--text-secondary); font-size: 0.72rem; min-width: 1.5em; }
+    .readlist-remove-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s ease, background 0.2s ease;
+    }
+    .readlist-remove-btn:hover {
+      color: var(--danger);
+      background: rgba(185, 28, 28, 0.08);
+    }
+    .readlist-clear {
+      background: none; border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-size: 0.7rem; cursor: pointer;
+    }
+    .readlist-clear:hover { border-color: var(--danger); color: var(--danger); }
+
+    /* Preferences */
+    .preferences-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+    .preferences-card h2 { margin-top: 0; font-size: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 16px; }
+    .preferences-group { margin-bottom: 16px; }
+    .preferences-label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; }
+    .chip-set { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { background: var(--bg-panel); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; border: 1px solid var(--border); }
+    .preferences-edit { background: none; border: 1px solid var(--border); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+    .preferences-edit:hover { border-color: var(--text-primary); }
+    .preferences-status { font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; min-height: 1.2em; }
+    textarea { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 8px; font-family: var(--font-mono); font-size: 0.85rem; }
+    .preferences-actions { margin-top: 12px; display: flex; gap: 8px; }
+    .preferences-actions button { padding: 6px 12px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-surface); cursor: pointer; font-size: 0.8rem; }
+    .preferences-actions button[type="submit"] { background: var(--text-primary); color: #fff; border-color: var(--text-primary); }
+
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+    .stat-card { background: var(--bg-surface); border: 1px solid var(--border); padding: 16px; border-radius: 8px; }
+    .stat-card h3 { margin: 0 0 8px; font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+    .stat-card p { margin: 0; font-size: 1.5rem; font-weight: 600; color: var(--text-primary); }
+    .stat-card ul { padding-left: 20px; margin: 0; font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Modal */
+    .abstract-modal {
+      position: fixed; inset: 0; z-index: 1000;
+      display: none; align-items: center; justify-content: center;
+      visibility: hidden; opacity: 0; transition: opacity 0.2s ease;
+      padding: 20px;
+      pointer-events: none;
+    }
+    .abstract-modal.is-open {
+      display: flex;
+      visibility: visible;
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .abstract-modal__backdrop {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+    }
+    .abstract-modal__dialog {
+      position: relative;
+      width: 100%; max-width: 700px; max-height: 85vh;
+      background: var(--bg-surface);
+      border-radius: 12px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+      display: flex; flex-direction: column;
+      z-index: 10;
+      overflow: hidden;
+    }
+    .abstract-modal__header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--bg-panel);
+    }
+    .abstract-modal__title { margin: 0; font-size: 1.1rem; font-weight: 600; font-family: var(--font-sans); }
+    .abstract-modal__close {
+      background: none; border: none; cursor: pointer; font-size: 0.9rem; color: var(--text-secondary);
+    }
+    .abstract-modal__close:hover { color: var(--text-primary); }
+    .abstract-modal__body { padding: 24px; overflow-y: auto; font-family: var(--font-serif); }
+    .abstract-modal__meta { font-family: var(--font-sans); font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px; }
+    .abstract-modal__abstract { font-size: 1rem; line-height: 1.7; color: var(--text-primary); margin-bottom: 24px; }
+    .abstract-modal__actions { display: flex; gap: 12px; padding-top: 20px; border-top: 1px solid var(--border); }
+    .abstract-modal__actions a {
+      padding: 8px 16px; border-radius: 6px; font-family: var(--font-sans); font-size: 0.9rem; text-decoration: none;
+    }
+    .abstract-modal__actions .primary { background: var(--text-primary); color: #fff; }
+    .abstract-modal__actions .primary:hover { opacity: 0.9; }
+    .abstract-modal__actions .secondary { background: var(--bg-panel); color: var(--text-primary); }
+    .abstract-modal__actions .secondary:hover { background: #e5e7eb; }
+
+    /* Interactive buttons */
+    .link-button {
+      background: none; border: 1px solid var(--border); color: var(--text-secondary);
+      font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; cursor: pointer; margin-left: 8px;
+      vertical-align: middle; font-family: var(--font-sans);
+    }
+    .link-button:hover { border-color: var(--text-primary); color: var(--text-primary); }
+    .link-button.is-active { background: var(--text-primary); color: #fff; border-color: var(--text-primary); }
+
     /* Mobile */
     @media (max-width: 768px) {
-      .layout { flex-direction: column; }
+      .layout { flex-direction: column; gap: 20px; }
       .sidebar { width: 100%; position: static; max-height: none; }
       .control-deck { flex-direction: column; align-items: stretch; }
-      .header-top { flex-direction: column; align-items: flex-start; }
+      .header-top { flex-direction: column; align-items: flex-start; gap: 12px; }
+      .header-actions { width: 100%; justify-content: space-between; }
     }
-    
+
+    body.modal-open { overflow: hidden; }
+
     /* Logic States (preserved for script.js) */
     .content-section.is-hidden { display: none; }
     .content-section.is-collapsed .section-body { display: none; }
-    .paper.paper--expanded { border-color: var(--brand); box-shadow: 0 0 20px var(--brand-dim); }
-    body.display-mode-title .paper .abstract, body.display-mode-title .paper .subjects { display: none; }
-    .source-button {
-        /* Preserving basic source button styles for logic */
-        background: transparent; border: 1px solid var(--border); color: var(--text-secondary); padding: 4px 12px; cursor: pointer;
+    .paper.paper--expanded { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-dim); }
+    body.display-mode-title .paper .abstract, body.display-mode-title .paper .subjects, body.display-mode-title .paper .summary { display: none; }
+    body.display-mode-authors .paper .abstract, body.display-mode-authors .paper .summary { display: none; }
+    footer {
+      text-align: center; font-size: 0.8rem; color: var(--text-secondary); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 40px;
     }
-    .source-button.is-active { background: var(--brand-dim); color: var(--brand); border-color: var(--brand); }
-    
-    .display-mode__button {
-         background: transparent; border: 1px solid var(--border); color: var(--text-secondary); padding: 4px 12px; cursor: pointer;
-    }
-    .display-mode__button.is-active { background: var(--brand-dim); color: var(--brand); border-color: var(--brand); }
   </style>
 </head>
 <body class="display-mode-authors">
   <header>
     <div class="inner">
       <div class="header-top">
-        <h1 class="page-title">ARXIV_DIGEST <span class="version">v2.0</span></h1>
+        <h1 class="page-title">
+          <button id="sidebar-toggle" type="button" aria-label="Toggle sidebar" title="Toggle sidebar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+          </button>
+          arXiv Daily Digest
+        </h1>
         <div class="header-actions">
           <div class="source-switcher" id="source-switcher" role="group"></div>
           <form class="date-switcher" id="date-switcher-form">
@@ -391,15 +532,15 @@
       <div class="control-deck">
         <div class="search-group">
           <span class="icon">🔍</span>
-          <input type="text" id="search-input" placeholder="SEARCH_DATABASE..." />
+          <input type="text" id="search-input" placeholder="Search title, author, keyword" />
         </div>
         <div class="filters-group">
           <select id="sort-select">
             <option value="newest">SORT: NEWEST</option>
             <option value="relevance">SORT: RELEVANCE</option>
           </select>
-          <button id="unread-toggle" class="toggle-btn">UNREAD_ONLY</button>
-          <button id="highlight-toggle" class="toggle-btn is-active">HIGHLIGHTS</button>
+          <button id="unread-toggle" class="toggle-btn">Unread</button>
+          <button id="highlight-toggle" class="toggle-btn is-active">Highlight</button>
         </div>
         <div class="display-mode" id="display-mode-controls"></div>
       </div>
@@ -518,7 +659,8 @@
         </div>
         <div class="abstract-modal__abstract" id="abstract-modal-abstract"></div>
         <div class="abstract-modal__actions">
-          <a href="#" target="_blank" rel="noopener" class="primary" id="abstract-modal-original">Open on arXiv</a>
+          <a href="#" target="_blank" rel="noopener" class="primary" id="abstract-modal-original">Open on AlphaXiv</a>
+          <a href="#" target="_blank" rel="noopener" class="secondary" id="abstract-modal-arxiv">Open on arXiv</a>
           <a href="#" target="_blank" rel="noopener" class="secondary" id="abstract-modal-pdf" hidden>Download PDF</a>
         </div>
       </div>
@@ -543,6 +685,7 @@
   const SORT_STORAGE_KEY = 'arxivDigestSortMode';
   const UNREAD_STORAGE_KEY = 'arxivDigestUnreadOnly';
   const HIGHLIGHT_STORAGE_KEY = 'arxivDigestHighlightEnabled';
+  const SIDEBAR_STORAGE_KEY = 'arxivDigestSidebarCollapsed';
   const DISPLAY_MODE_CLASSES = {
     title: 'display-mode-title',
     authors: 'display-mode-authors',
@@ -554,6 +697,7 @@
     { key: 'full', label: 'Full details' },
   ];
   let modalHandlersBound = false;
+  let readObserver = null;
 
   const SOURCE_KEYS = Object.keys(RAW_DATA.sources || {});
   if (!SOURCE_KEYS.length) {
@@ -577,12 +721,22 @@
     sortMode: loadStoredSortMode() || 'newest',
     unreadOnly: loadStoredUnreadOnly(),
     highlightEnabled: loadStoredHighlightEnabled(),
+    sidebarCollapsed: loadStoredSidebarCollapsed(),
   };
 
   if (!RAW_DATA.sources[state.source]) {
     state.source = RAW_DATA.default_source && RAW_DATA.sources[RAW_DATA.default_source]
       ? RAW_DATA.default_source
       : SOURCE_KEYS[0];
+  }
+
+  const shouldAutoCollapse = window.matchMedia && window.matchMedia('(max-width: 1100px)').matches;
+  if (shouldAutoCollapse && !state.sidebarCollapsed) {
+    state.sidebarCollapsed = true;
+    saveSidebarCollapsed(true);
+  }
+  if (state.sidebarCollapsed) {
+    document.body.classList.add('sidebar-collapsed');
   }
 
   const elements = {
@@ -630,6 +784,7 @@
     abstractModalSummary: document.getElementById('abstract-modal-summary'),
     abstractModalAbstract: document.getElementById('abstract-modal-abstract'),
     abstractModalOriginal: document.getElementById('abstract-modal-original'),
+    abstractModalArxiv: document.getElementById('abstract-modal-arxiv'),
     abstractModalPdf: document.getElementById('abstract-modal-pdf'),
   };
 
@@ -710,6 +865,15 @@
     });
   }
 
+  const sidebarToggle = document.getElementById('sidebar-toggle');
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', () => {
+      state.sidebarCollapsed = !state.sidebarCollapsed;
+      document.body.classList.toggle('sidebar-collapsed', state.sidebarCollapsed);
+      saveSidebarCollapsed(state.sidebarCollapsed);
+    });
+  }
+
   if (elements.readListClear) {
     elements.readListClear.addEventListener('click', () => {
       state.readList = [];
@@ -779,6 +943,7 @@
     updatePaperAria();
     updateReadListButtons();
     applyReadState();
+    observeReadState();
   }
 
   function updateToggleStates() {
@@ -960,6 +1125,12 @@
 
   function resolveArticleId(article) {
     return String(article && (article.arxiv_id || article.id) ? article.arxiv_id || article.id : '').trim();
+  }
+
+  function toAlphaxivUrl(url) {
+    const value = String(url || '');
+    if (!value) return '';
+    return value.replace(/^https?:\/\/arxiv\.org\//, 'https://www.alphaxiv.org/');
   }
 
   function shouldHighlightArticle(article) {
@@ -1399,6 +1570,7 @@
     state.lastModalTrigger = trigger || null;
     const resolvedTitle = decodeHtml(details.title) || 'Preview abstract';
     const resolvedUrl = decodeHtml(details.url);
+    const resolvedArxiv = decodeHtml(details.arxivUrl);
     const resolvedAuthors = decodeHtml(details.authors);
     const resolvedSubjects = decodeHtml(details.subjects);
     const resolvedSummary = decodeHtml(details.summary);
@@ -1443,6 +1615,15 @@
       } else {
         elements.abstractModalOriginal.href = '#';
         elements.abstractModalOriginal.hidden = true;
+      }
+    }
+    if (elements.abstractModalArxiv) {
+      if (resolvedArxiv) {
+        elements.abstractModalArxiv.href = resolvedArxiv;
+        elements.abstractModalArxiv.hidden = false;
+      } else {
+        elements.abstractModalArxiv.href = '#';
+        elements.abstractModalArxiv.hidden = true;
       }
     }
     if (elements.abstractModalPdf) {
@@ -1498,20 +1679,27 @@
     const subjects = escapeHtml((article.subjects || []).join('; '));
     const abstract = escapeHtml(article.abstract);
     const summary = escapeHtml(article.summary || '');
-    const absUrl = escapeHtml(article.abs_url);
+    const arxivUrlRaw = String(article.abs_url || '');
+    const alphaxivUrlRaw = toAlphaxivUrl(arxivUrlRaw);
+    const absUrl = escapeHtml(alphaxivUrlRaw);
+    const arxivUrl = escapeHtml(arxivUrlRaw);
     const pdfUrl = article.pdf_url ? escapeHtml(article.pdf_url) : '';
     const pdfLink = pdfUrl ? `<a href="${pdfUrl}" target="_blank" rel="noopener">PDF</a>` : '';
-    const quickViewButton = `<button type="button" class="link-button quick-view-button js-view-abstract" data-abs-url="${absUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-summary="${summary}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}">Quick view</button>`;
+    const quickViewButton = `<button type="button" class="link-button quick-view-button js-view-abstract" data-abs-url="${absUrl}" data-article-arxiv="${arxivUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-summary="${summary}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}">Quick view</button>`;
     const inReadList = isInReadList(articleId);
-    const readListLabel = inReadList ? 'In read list' : 'Add to read list';
+    const readListLabel = inReadList ? 'Saved' : 'Save';
     const readListActiveClass = inReadList ? ' is-active' : '';
-    const readListButton = `<button type="button" class="link-button readlist-toggle js-readlist-toggle${readListActiveClass}" data-abs-url="${absUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-summary="${summary}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}" aria-pressed="${inReadList}">${readListLabel}</button>`;
+    const readListButton = `<button type="button" class="link-button readlist-toggle js-readlist-toggle${readListActiveClass}" data-abs-url="${absUrl}" data-article-arxiv="${arxivUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-summary="${summary}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}" aria-pressed="${inReadList}">${readListLabel}</button>`;
     const keywords = Array.isArray(article.keywords) ? article.keywords : [];
     const keywordBadges = keywords.length
-      ? `<span class="keyword-tags">${keywords.map((keyword) => `<span class="keyword-tag">${escapeHtml(keyword)}</span>`).join('')}</span>`
+      ? keywords.map((keyword) => `<span class="keyword-tag">${escapeHtml(keyword)}</span>`).join('')
       : '';
     const searchText = buildSearchText(article);
-    const linkItems = [`<a href="${absUrl}" target="_blank" rel="noopener">Abstract</a>`, pdfLink].filter(Boolean).join(' ');
+    const linkItems = [
+      alphaxivUrlRaw ? `<a href="${absUrl}" target="_blank" rel="noopener">AlphaXiv</a>` : '',
+      arxivUrlRaw ? `<a href="${arxivUrl}" target="_blank" rel="noopener">arXiv</a>` : '',
+      pdfLink,
+    ].filter(Boolean).join(' ');
     const isUserExpanded = state.expandedArticles.has(articleId);
     const ariaExpanded = state.displayMode === 'full' || isUserExpanded;
     const expandedClass = isUserExpanded ? ' paper--expanded' : '';
@@ -1521,7 +1709,16 @@
       : '';
     return `
       <article class="paper${expandedClass}${highlightClass}" data-paper-id="${escapeHtml(articleId)}" data-search="${escapeHtml(searchText)}" tabindex="0" aria-expanded="${ariaExpanded}">
-        <h3><a href="${absUrl}" target="_blank" rel="noopener">${title}</a>${keywordBadges}${quickViewButton}${readListButton}</h3>
+        <div class="paper-header-row">
+          <div class="paper-title-col">
+            <h3><a href="${absUrl}" target="_blank" rel="noopener">${title}</a></h3>
+            <div class="paper-tags-row">${keywordBadges}</div>
+          </div>
+          <div class="paper-actions-col">
+            ${quickViewButton}
+            ${readListButton}
+          </div>
+        </div>
         <p class="meta">
           <span class="id">${escapeHtml(article.arxiv_id)}</span>
           <span class="authors">${authors}</span>
@@ -1538,14 +1735,17 @@
     const id = escapeHtml(rawId);
     const title = escapeHtml(item.title || rawId);
     const absUrl = escapeHtml(item.absUrl || item.url || '#');
-    const deleteButton = `<button type="button" class="readlist-action readlist-action--danger readlist-action--inline readlist-action--dot" data-readlist-remove="${id}" aria-label="Delete from read list">D</button>`;
-    const titleLabel = `${index + 1}. `;
+    const deleteIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    const deleteButton = `<button type="button" class="readlist-remove-btn" data-readlist-remove="${id}" aria-label="Remove from read list" title="Remove">${deleteIcon}</button>`;
+    const titleLabel = `${index + 1}.`;
     return `
       <div class="readlist-item" data-readlist-id="${id}">
-        <div class="readlist-item__title-row">
-          <div class="readlist-title">
-            ${deleteButton}<span class="readlist-index">${titleLabel}</span><a href="${absUrl}" target="_blank" rel="noopener">${title}</a>
+        <div class="readlist-item__container">
+          <div class="readlist-link-group">
+            <span class="readlist-index">${titleLabel}</span>
+            <a href="${absUrl}" target="_blank" rel="noopener" title="${title}">${title}</a>
           </div>
+          ${deleteButton}
         </div>
       </div>
     `;
@@ -1656,6 +1856,23 @@
     } else {
       applyReadState();
     }
+  }
+
+  function observeReadState() {
+    if (!('IntersectionObserver' in window)) return;
+    if (readObserver) {
+      readObserver.disconnect();
+    }
+    readObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+          const paper = entry.target;
+          const paperId = paper.getAttribute('data-paper-id') || '';
+          markAsRead(paperId);
+        }
+      });
+    }, { threshold: [0.6] });
+    Array.from(document.querySelectorAll('.paper')).forEach((card) => readObserver.observe(card));
   }
 
   function isInReadList(articleId) {
@@ -1878,6 +2095,20 @@
     } catch (_) {}
   }
 
+  function loadStoredSidebarCollapsed() {
+    try {
+      return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function saveSidebarCollapsed(value) {
+    try {
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(Boolean(value)));
+    } catch (_) {}
+  }
+
   function loadStoredReadList() {
     try {
       const raw = localStorage.getItem(READ_LIST_STORAGE_KEY);
@@ -1939,7 +2170,8 @@
     const dataset = button.dataset || {};
     const details = {
       title: article && article.title ? article.title : dataset.articleTitle || '',
-      url: article && article.abs_url ? article.abs_url : dataset.absUrl || '',
+      url: toAlphaxivUrl(article && article.abs_url ? article.abs_url : dataset.absUrl || ''),
+      arxivUrl: article && article.abs_url ? article.abs_url : dataset.articleArxiv || '',
       authors: Array.isArray(article && article.authors) ? article.authors.join(', ') : dataset.articleAuthors || '',
       subjects: Array.isArray(article && article.subjects) ? article.subjects.join('; ') : dataset.articleSubjects || '',
       abstract: article && article.abstract ? article.abstract : dataset.articleAbstract || '',

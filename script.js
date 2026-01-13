@@ -11,6 +11,7 @@
   const SORT_STORAGE_KEY = 'arxivDigestSortMode';
   const UNREAD_STORAGE_KEY = 'arxivDigestUnreadOnly';
   const HIGHLIGHT_STORAGE_KEY = 'arxivDigestHighlightEnabled';
+  const SIDEBAR_STORAGE_KEY = 'arxivDigestSidebarCollapsed';
   const DISPLAY_MODE_CLASSES = {
     title: 'display-mode-title',
     authors: 'display-mode-authors',
@@ -22,6 +23,7 @@
     { key: 'full', label: 'Full details' },
   ];
   let modalHandlersBound = false;
+  let readObserver = null;
 
   const SOURCE_KEYS = Object.keys(RAW_DATA.sources || {});
   if (!SOURCE_KEYS.length) {
@@ -45,12 +47,22 @@
     sortMode: loadStoredSortMode() || 'newest',
     unreadOnly: loadStoredUnreadOnly(),
     highlightEnabled: loadStoredHighlightEnabled(),
+    sidebarCollapsed: loadStoredSidebarCollapsed(),
   };
 
   if (!RAW_DATA.sources[state.source]) {
     state.source = RAW_DATA.default_source && RAW_DATA.sources[RAW_DATA.default_source]
       ? RAW_DATA.default_source
       : SOURCE_KEYS[0];
+  }
+
+  const shouldAutoCollapse = window.matchMedia && window.matchMedia('(max-width: 1100px)').matches;
+  if (shouldAutoCollapse && !state.sidebarCollapsed) {
+    state.sidebarCollapsed = true;
+    saveSidebarCollapsed(true);
+  }
+  if (state.sidebarCollapsed) {
+    document.body.classList.add('sidebar-collapsed');
   }
 
   const elements = {
@@ -98,6 +110,7 @@
     abstractModalSummary: document.getElementById('abstract-modal-summary'),
     abstractModalAbstract: document.getElementById('abstract-modal-abstract'),
     abstractModalOriginal: document.getElementById('abstract-modal-original'),
+    abstractModalArxiv: document.getElementById('abstract-modal-arxiv'),
     abstractModalPdf: document.getElementById('abstract-modal-pdf'),
   };
 
@@ -178,6 +191,15 @@
     });
   }
 
+  const sidebarToggle = document.getElementById('sidebar-toggle');
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', () => {
+      state.sidebarCollapsed = !state.sidebarCollapsed;
+      document.body.classList.toggle('sidebar-collapsed', state.sidebarCollapsed);
+      saveSidebarCollapsed(state.sidebarCollapsed);
+    });
+  }
+
   if (elements.readListClear) {
     elements.readListClear.addEventListener('click', () => {
       state.readList = [];
@@ -247,6 +269,7 @@
     updatePaperAria();
     updateReadListButtons();
     applyReadState();
+    observeReadState();
   }
 
   function updateToggleStates() {
@@ -428,6 +451,12 @@
 
   function resolveArticleId(article) {
     return String(article && (article.arxiv_id || article.id) ? article.arxiv_id || article.id : '').trim();
+  }
+
+  function toAlphaxivUrl(url) {
+    const value = String(url || '');
+    if (!value) return '';
+    return value.replace(/^https?:\/\/arxiv\.org\//, 'https://www.alphaxiv.org/');
   }
 
   function shouldHighlightArticle(article) {
@@ -867,6 +896,7 @@
     state.lastModalTrigger = trigger || null;
     const resolvedTitle = decodeHtml(details.title) || 'Preview abstract';
     const resolvedUrl = decodeHtml(details.url);
+    const resolvedArxiv = decodeHtml(details.arxivUrl);
     const resolvedAuthors = decodeHtml(details.authors);
     const resolvedSubjects = decodeHtml(details.subjects);
     const resolvedSummary = decodeHtml(details.summary);
@@ -911,6 +941,15 @@
       } else {
         elements.abstractModalOriginal.href = '#';
         elements.abstractModalOriginal.hidden = true;
+      }
+    }
+    if (elements.abstractModalArxiv) {
+      if (resolvedArxiv) {
+        elements.abstractModalArxiv.href = resolvedArxiv;
+        elements.abstractModalArxiv.hidden = false;
+      } else {
+        elements.abstractModalArxiv.href = '#';
+        elements.abstractModalArxiv.hidden = true;
       }
     }
     if (elements.abstractModalPdf) {
@@ -966,20 +1005,27 @@
     const subjects = escapeHtml((article.subjects || []).join('; '));
     const abstract = escapeHtml(article.abstract);
     const summary = escapeHtml(article.summary || '');
-    const absUrl = escapeHtml(article.abs_url);
+    const arxivUrlRaw = String(article.abs_url || '');
+    const alphaxivUrlRaw = toAlphaxivUrl(arxivUrlRaw);
+    const absUrl = escapeHtml(alphaxivUrlRaw);
+    const arxivUrl = escapeHtml(arxivUrlRaw);
     const pdfUrl = article.pdf_url ? escapeHtml(article.pdf_url) : '';
     const pdfLink = pdfUrl ? `<a href="${pdfUrl}" target="_blank" rel="noopener">PDF</a>` : '';
-    const quickViewButton = `<button type="button" class="link-button quick-view-button js-view-abstract" data-abs-url="${absUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-summary="${summary}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}">Quick view</button>`;
+    const quickViewButton = `<button type="button" class="link-button quick-view-button js-view-abstract" data-abs-url="${absUrl}" data-article-arxiv="${arxivUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-summary="${summary}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}">Quick view</button>`;
     const inReadList = isInReadList(articleId);
-    const readListLabel = inReadList ? 'In read list' : 'Add to read list';
+    const readListLabel = inReadList ? 'Saved' : 'Save';
     const readListActiveClass = inReadList ? ' is-active' : '';
-    const readListButton = `<button type="button" class="link-button readlist-toggle js-readlist-toggle${readListActiveClass}" data-abs-url="${absUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-summary="${summary}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}" aria-pressed="${inReadList}">${readListLabel}</button>`;
+    const readListButton = `<button type="button" class="link-button readlist-toggle js-readlist-toggle${readListActiveClass}" data-abs-url="${absUrl}" data-article-arxiv="${arxivUrl}" data-article-title="${title}" data-article-authors="${authors}" data-article-subjects="${subjects}" data-article-abstract="${abstract}" data-article-summary="${summary}" data-article-id="${escapeHtml(article.arxiv_id)}" data-article-pdf="${pdfUrl}" aria-pressed="${inReadList}">${readListLabel}</button>`;
     const keywords = Array.isArray(article.keywords) ? article.keywords : [];
     const keywordBadges = keywords.length
-      ? `<span class="keyword-tags">${keywords.map((keyword) => `<span class="keyword-tag">${escapeHtml(keyword)}</span>`).join('')}</span>`
+      ? keywords.map((keyword) => `<span class="keyword-tag">${escapeHtml(keyword)}</span>`).join('')
       : '';
     const searchText = buildSearchText(article);
-    const linkItems = [`<a href="${absUrl}" target="_blank" rel="noopener">Abstract</a>`, pdfLink].filter(Boolean).join(' ');
+    const linkItems = [
+      alphaxivUrlRaw ? `<a href="${absUrl}" target="_blank" rel="noopener">AlphaXiv</a>` : '',
+      arxivUrlRaw ? `<a href="${arxivUrl}" target="_blank" rel="noopener">arXiv</a>` : '',
+      pdfLink,
+    ].filter(Boolean).join(' ');
     const isUserExpanded = state.expandedArticles.has(articleId);
     const ariaExpanded = state.displayMode === 'full' || isUserExpanded;
     const expandedClass = isUserExpanded ? ' paper--expanded' : '';
@@ -989,7 +1035,16 @@
       : '';
     return `
       <article class="paper${expandedClass}${highlightClass}" data-paper-id="${escapeHtml(articleId)}" data-search="${escapeHtml(searchText)}" tabindex="0" aria-expanded="${ariaExpanded}">
-        <h3><a href="${absUrl}" target="_blank" rel="noopener">${title}</a>${keywordBadges}${quickViewButton}${readListButton}</h3>
+        <div class="paper-header-row">
+          <div class="paper-title-col">
+            <h3><a href="${absUrl}" target="_blank" rel="noopener">${title}</a></h3>
+            <div class="paper-tags-row">${keywordBadges}</div>
+          </div>
+          <div class="paper-actions-col">
+            ${quickViewButton}
+            ${readListButton}
+          </div>
+        </div>
         <p class="meta">
           <span class="id">${escapeHtml(article.arxiv_id)}</span>
           <span class="authors">${authors}</span>
@@ -1006,14 +1061,17 @@
     const id = escapeHtml(rawId);
     const title = escapeHtml(item.title || rawId);
     const absUrl = escapeHtml(item.absUrl || item.url || '#');
-    const deleteButton = `<button type="button" class="readlist-action readlist-action--danger readlist-action--inline readlist-action--dot" data-readlist-remove="${id}" aria-label="Delete from read list">D</button>`;
-    const titleLabel = `${index + 1}. `;
+    const deleteIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    const deleteButton = `<button type="button" class="readlist-remove-btn" data-readlist-remove="${id}" aria-label="Remove from read list" title="Remove">${deleteIcon}</button>`;
+    const titleLabel = `${index + 1}.`;
     return `
       <div class="readlist-item" data-readlist-id="${id}">
-        <div class="readlist-item__title-row">
-          <div class="readlist-title">
-            ${deleteButton}<span class="readlist-index">${titleLabel}</span><a href="${absUrl}" target="_blank" rel="noopener">${title}</a>
+        <div class="readlist-item__container">
+          <div class="readlist-link-group">
+            <span class="readlist-index">${titleLabel}</span>
+            <a href="${absUrl}" target="_blank" rel="noopener" title="${title}">${title}</a>
           </div>
+          ${deleteButton}
         </div>
       </div>
     `;
@@ -1124,6 +1182,23 @@
     } else {
       applyReadState();
     }
+  }
+
+  function observeReadState() {
+    if (!('IntersectionObserver' in window)) return;
+    if (readObserver) {
+      readObserver.disconnect();
+    }
+    readObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+          const paper = entry.target;
+          const paperId = paper.getAttribute('data-paper-id') || '';
+          markAsRead(paperId);
+        }
+      });
+    }, { threshold: [0.6] });
+    Array.from(document.querySelectorAll('.paper')).forEach((card) => readObserver.observe(card));
   }
 
   function isInReadList(articleId) {
@@ -1346,6 +1421,20 @@
     } catch (_) {}
   }
 
+  function loadStoredSidebarCollapsed() {
+    try {
+      return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function saveSidebarCollapsed(value) {
+    try {
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(Boolean(value)));
+    } catch (_) {}
+  }
+
   function loadStoredReadList() {
     try {
       const raw = localStorage.getItem(READ_LIST_STORAGE_KEY);
@@ -1407,7 +1496,8 @@
     const dataset = button.dataset || {};
     const details = {
       title: article && article.title ? article.title : dataset.articleTitle || '',
-      url: article && article.abs_url ? article.abs_url : dataset.absUrl || '',
+      url: toAlphaxivUrl(article && article.abs_url ? article.abs_url : dataset.absUrl || ''),
+      arxivUrl: article && article.abs_url ? article.abs_url : dataset.articleArxiv || '',
       authors: Array.isArray(article && article.authors) ? article.authors.join(', ') : dataset.articleAuthors || '',
       subjects: Array.isArray(article && article.subjects) ? article.subjects.join('; ') : dataset.articleSubjects || '',
       abstract: article && article.abstract ? article.abstract : dataset.articleAbstract || '',
