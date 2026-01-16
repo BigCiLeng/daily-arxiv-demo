@@ -24,6 +24,7 @@
   ];
   let modalHandlersBound = false;
   let readObserver = null;
+  let seenReadCandidates = new Set();
 
   const SOURCE_KEYS = Object.keys(RAW_DATA.sources || {});
   if (!SOURCE_KEYS.length) {
@@ -761,7 +762,6 @@
     if (!details.url && !details.title) return;
     event.preventDefault();
     event.stopPropagation();
-    markAsRead(articleId);
     openAbstractModal(details, button);
   }
 
@@ -771,7 +771,6 @@
     if (event.target.closest('a')) return;
     if (event.target.closest('.js-view-abstract')) return;
     if (event.target.closest('.js-readlist-toggle')) return;
-    markAsRead(paper.getAttribute('data-paper-id'));
     togglePaperExpansion(paper);
   }
 
@@ -780,7 +779,6 @@
     if (!link) return;
     const paper = link.closest('.paper');
     if (!paper) return;
-    markAsRead(paper.getAttribute('data-paper-id'));
   }
 
   function handlePaperKeydown(event) {
@@ -791,7 +789,6 @@
       event.preventDefault();
     }
     if (event.target.closest('.js-readlist-toggle')) return;
-    markAsRead(paper.getAttribute('data-paper-id'));
     togglePaperExpansion(paper);
   }
 
@@ -1189,16 +1186,32 @@
     if (readObserver) {
       readObserver.disconnect();
     }
+    const cards = Array.from(document.querySelectorAll('.paper'));
+    const currentIds = new Set(cards.map((card) => card.getAttribute('data-paper-id') || '').filter(Boolean));
+    seenReadCandidates.forEach((id) => {
+      if (!currentIds.has(id)) {
+        seenReadCandidates.delete(id);
+      }
+    });
     readObserver = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
+        const paper = entry.target;
+        const paperId = paper.getAttribute('data-paper-id') || '';
+        if (!paperId || state.readIds.has(paperId)) {
+          seenReadCandidates.delete(paperId);
+          return;
+        }
         if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-          const paper = entry.target;
-          const paperId = paper.getAttribute('data-paper-id') || '';
+          seenReadCandidates.add(paperId);
+          return;
+        }
+        if (seenReadCandidates.has(paperId)) {
+          seenReadCandidates.delete(paperId);
           markAsRead(paperId);
         }
       });
     }, { threshold: [0.6] });
-    Array.from(document.querySelectorAll('.paper')).forEach((card) => readObserver.observe(card));
+    cards.forEach((card) => readObserver.observe(card));
   }
 
   function isInReadList(articleId) {
