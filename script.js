@@ -1201,7 +1201,7 @@
           seenReadCandidates.delete(paperId);
           return;
         }
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+        if (entry.isIntersecting) {
           seenReadCandidates.add(paperId);
           return;
         }
@@ -1210,7 +1210,7 @@
           markAsRead(paperId);
         }
       });
-    }, { threshold: [0.6] });
+    }, { threshold: [0] });
     cards.forEach((card) => readObserver.observe(card));
   }
 
