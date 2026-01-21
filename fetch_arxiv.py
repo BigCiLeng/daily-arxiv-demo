@@ -53,7 +53,7 @@ DETAIL_ABSTRACT_CACHE: Dict[str, str] = {}
 ARTICLE_INSIGHT_CACHE: Dict[str, Tuple[List[str], str]] = {}
 
 # KEYWORD_API_URL = os.getenv("OPENROUTER_API_URL", "https://openrouter.ai/api/v1/chat/completions")
-# KEYWORD_API_KEY = os.getenv("OPENROUTER_API_KEY", "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").strip()
+# KEYWORD_API_KEY = os.getenv("OPENROUTER_API_KEY").strip()
 # KEYWORD_API_MODEL = os.getenv("OPENROUTER_KEYWORD_MODEL", "deepseek/deepseek-r1-0528-qwen3-8b:free")
 KEYWORD_API_URL = os.getenv("OPENROUTER_API_URL", "https://api.siliconflow.cn/v1/chat/completions")
 KEYWORD_API_KEY = os.getenv("OPENROUTER_API_KEY")
